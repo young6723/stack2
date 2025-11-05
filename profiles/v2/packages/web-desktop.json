@@ -1,0 +1,11 @@
+{
+  "__version__": "1.0.1",
+  "builder": {
+    "common": {
+      "polyfills": {
+        "asyncFunctions": true
+      },
+      "name": "方块堆堆乐"
+    }
+  }
+}
