@@ -1,0 +1,9 @@
+{
+  "name": "submitScore",
+  "version": "1.0.0",
+  "description": "Update player score to leaderboard.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

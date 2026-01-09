@@ -1,0 +1,9 @@
+{
+  "name": "getLeaderboard",
+  "version": "1.0.0",
+  "description": "Fetch top leaderboard records.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -1,5 +1,24 @@
 // Import necessary Cocos Creator modules
-import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Color, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys } from 'cc';
+import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys } from 'cc';
+import { FriendRankView } from './FriendRankView';
+declare const wx: any;
+type LeaderboardRowRefs = {
+    rankLabel: Label;
+    pointsLabel: Label;
+    layersLabel: Label;
+    crownNode?: Node;
+};
+type LeaderboardEntry = {
+    points: number;
+    layers: number;
+    date: number;
+    nickname?: string;
+    avatarUrl?: string;
+};
+type LeaderboardView = {
+    root: Node;
+    rows: LeaderboardRowRefs[];
+};
 
 
 const LB_KEY = 'stack_leaderboard_v1';
@@ -95,12 +114,30 @@ export class StackGame extends Component {
     showLeaderboardOnStart: boolean = false; // 是否在开始遮罩显示排行榜（默认不显示）
     private startOverlayNode: Node = null;      // 开始遮罩根节点
     private isWaitingStart: boolean = true;     // 开局等待开始
+    private _requestingStartProfile: boolean = false;
 
     // —— GameOver Overlay ——
     @property
     restartOnTap: boolean = true;               // 允许点击遮罩重新开始
     private gameOverOverlayNode: Node = null;   // 结束遮罩根节点
     private _isSceneLoading: boolean = false;
+
+    // —— 复活/激励视频 —— 
+    @property
+    enableReviveAd: boolean = true;             // 是否启用“看广告复活”
+    @property
+    reviveAdUnitId: string = '';                // 激励视频广告位 ID（微信后台获取）
+    @property
+    reviveMaxTimes: number = 1;                 // 单局可复活次数
+    @property
+    mockReviveInEditor: boolean = true;         // 非微信环境下是否直接模拟成功，便于调试
+    @property
+    reviveMinScaleRatio: number = 0.65;         // 复活时底块的最小 X/Z 比例（相对于初始底座尺寸），太薄则回填到该比例
+    private _reviveOverlayNode: Node = null;    // 复活弹窗节点
+    private _rewardedAd: any = null;            // 微信激励视频实例
+    private _reviveRequesting: boolean = false; // 正在请求广告
+    private _reviveCount: number = 0;           // 已使用复活次数
+    private _gameOverFinalized: boolean = false; // 防止重复结算
 
     private movingBlock: Node = null;
     private baseBlock: Node = null;
@@ -119,6 +156,23 @@ export class StackGame extends Component {
         input.once(Input.EventType.TOUCH_START, startBGM, this);
         input.once(Input.EventType.MOUSE_DOWN, startBGM, this);
         input.once(Input.EventType.KEY_DOWN, startBGM, this);
+    }
+    // 判断事件是否落在好友榜按钮上（避免遮罩吞掉按钮点击）
+    private _isEventOnFriendButton(evt: any): boolean {
+        try {
+            const btn: Node | null = FriendRankView['_buttonNode'] || null;
+            if (!btn || !btn.isValid) return false;
+            const ui = btn.getComponent(UITransform);
+            if (!ui || !ui.isValid) return false;
+            const loc = evt?.getLocation?.();
+            if (!loc) return false;
+            const { x, y } = loc;
+            const pos = ui.convertToNodeSpaceAR(new Vec3(x, y, 0));
+            const size = ui.contentSize;
+            return Math.abs(pos.x) <= size.width / 2 && Math.abs(pos.y) <= size.height / 2;
+        } catch {
+            return false;
+        }
     }
     private direction: number = 1;
     @property
@@ -169,6 +223,17 @@ export class StackGame extends Component {
 
     private baseHueOffset: number = 0;
 
+    protected onLoad(): void {
+        // 初始隐藏好友榜面板，等按钮点击后再显示
+        try { FriendRankView.hide?.(); } catch (e) { console.warn('[FriendRank] hide on load failed', e); }
+        const scene = director.getScene();
+        const canvas = scene?.getChildByName('Canvas');
+        const fr = canvas?.getChildByName('FriendRankRoot') ?? scene?.getChildByName('FriendRankRoot');
+        if (fr && fr.isValid) {
+            fr.active = false;
+        }
+    }
+
     // ===== 颜色：递增色相 + 好看曲线（保持你原来的递增风格） =====
     @property
     hueStep: number = 10;       // 每层色相步进（°）
@@ -191,12 +256,25 @@ export class StackGame extends Component {
 
     private _baseMaxX: number = 0;   // 初始 X 作为放大上限
     private _baseMaxZ: number = 0;   // 初始 Z 作为放大上限
+    private _cameraBasePos: Vec3 | null = null; // 记录场景里设置的初始相机位置，抬升时沿用 X/Z
+    private _cameraBaseEuler: Vec3 | null = null; // 记录初始欧拉角，拉远时沿用
+    private _cameraBaseOrtho: number | null = null; // 记录初始正交高度，拉远时放大
+
+    // —— 分享配置（微信小游戏） ——
+    @property
+    shareTitle: string = '方块堆堆高';
+    @property
+    shareImageUrl: string = ''; // 建议填写 5:4 或 1:1 的 https 图
+    @property
+    shareQuery: string = '';    // 追加到分享 query 的参数，例如 "from=share"
 
     // 连击计数：连续完美堆叠次数（非完美或失败时清零）
     private comboCount: number = 0;
     private _isSpawning: boolean = false; // 生成入场期间暂停物理移动，避免越界反弹
 
     private _tmpPos: Vec3 = new Vec3(); // 复用的临时向量，减少 GC 抖动
+    private _profileCache: { nickName: string; avatarUrl: string } | null = null;
+    private _leaderboardViews: LeaderboardView[] = [];
 
     // ===== UI scale baseline (avoid cumulative growth when punch-scaling) =====
     private _uiBaseScale: Map<Node, Vec3> = new Map();
@@ -204,19 +282,30 @@ export class StackGame extends Component {
         if (!n || !n.isValid) return;
         if (!this._uiBaseScale.has(n)) this._uiBaseScale.set(n, n.scale.clone());
     }
+    private _isAlive(node?: Node | null): boolean {
+        return !!(node && node.isValid);
+    }
 
     // ===== 简易对象池（降低 instantiate/destroy 带来的 GC 抖动） =====
-    private _pool: { block: Node[]; strip: Node[] } = { block: [], strip: [] };
+    private _pool: { block: Node[]; strip: Node[]; effect: Node[] } = { block: [], strip: [], effect: [] };
 
-    private _recycle(node: Node, type: 'block' | 'strip'): void {
+    private _recycle(node: Node, type: 'block' | 'strip' | 'effect'): void {
         if (!node || !node.isValid) return;
-        try { (tween as any).stopAllByTarget?.(node); } catch {}
+        Tween.stopAllByTarget(node);
+        node.children.forEach(child => Tween.stopAllByTarget(child));
         node.removeFromParent();
         node.setScale(1, 1, 1);
         node.setRotationFromEuler(0, 0, 0);
         node.setPosition(0, 0, 0);
-        // 清理一下名称前缀（可选）
-        if (type === 'block') this._pool.block.push(node); else this._pool.strip.push(node);
+        if (type === 'block') {
+            this._pool.block.push(node);
+        } else if (type === 'strip') {
+            this._pool.strip.push(node);
+        } else {
+            node.active = false;
+            this._resetEffectNode(node);
+            this._pool.effect.push(node);
+        }
     }
 
     private _acquireBlock(): Node {
@@ -226,6 +315,42 @@ export class StackGame extends Component {
     private _acquireStrip(): Node {
         // 光环/爆发条带也复用 blockPrefab 的网格
         return this._pool.strip.pop() ?? instantiate(this.blockPrefab);
+    }
+
+    private _acquireEffect(): Node | null {
+        if (!this.perfectEffectPrefab) return null;
+        const node = this._pool.effect.pop() ?? instantiate(this.perfectEffectPrefab);
+        node.active = true;
+        this._resetEffectNode(node);
+        return node;
+    }
+
+    private _resetEffectNode(effect: Node): void {
+        const cacheKey = '__defaults';
+        let defaults = (effect as any)[cacheKey] as Array<{ child: Node; pos: Vec3; scale: Vec3; rot: Vec3; active: boolean }>;
+        if (!defaults) {
+            defaults = effect.children.map(child => ({
+                child,
+                pos: child.position.clone(),
+                scale: child.scale.clone(),
+                rot: new Vec3(child.eulerAngles),
+                active: child.active
+            }));
+            (effect as any)[cacheKey] = defaults;
+        }
+        effect.setScale(1, 1, 1);
+        effect.setRotationFromEuler(0, 0, 0);
+        defaults.forEach(entry => {
+            const child = entry.child;
+            if (!child || !child.isValid) return;
+            Tween.stopAllByTarget(child);
+            child.setPosition(entry.pos);
+            child.setScale(entry.scale);
+            child.setRotationFromEuler(entry.rot.x, entry.rot.y, entry.rot.z);
+            child.active = entry.active;
+            const op = child.getComponent(UIOpacity);
+            if (op) op.opacity = 0;
+        });
     }
 
     // 计算初始底座与第一块的 X/Z 缩放，自动根据屏幕高宽比微调，防止初始方块超出画面
@@ -261,12 +386,7 @@ export class StackGame extends Component {
     // —— 自适配 UI 布局：把分数锚到屏幕右上角，适配不同机型 ——
     private _onWindowResize = () => this._applyUILayout();
     private _applyUILayout(): void {
-        // —— 固定位置版：不做复杂自适应，只给右上角主分数一个固定边距 ——
-        // 我们仅计算画布宽高用于把锚点在右上角的 Label 放到 (right - mx, top - my)。
-        // 这样简单、稳定，不依赖安全区/胶囊按钮等信息。
-        // 需要在分辨率变化时也更新一次，所以仍然保留此函数在 resize 时被调用。
-        const FIX_RIGHT_MARGIN = 100; // 距右边固定 56 像素
-        const FIX_TOP_MARGIN   = 350; // 距顶部固定 84 像素（多留冗余，避免与微信“关闭/胶囊”重叠）
+        if (!this._isAlive(this.uiCanvas)) return;
 
         // 取可见尺寸（编辑器/运行时都可靠），兜底用 screen.windowSize
         let w = 1080, h = 2340;
@@ -286,25 +406,48 @@ export class StackGame extends Component {
             h = screen?.windowSize?.height ?? 2340;
         }
 
+        // 基于分辨率的缩放系数（旧设计基于 1080x2340）
+        const baseW = 750;
+        const baseH = 1334;
+        const scale = Math.max(0.7, Math.min(0.95, Math.min(w / baseW, h / baseH)));
+
+        // 自适应边距：随分辨率变化，防止 750x1334 下过于居中
+        // 将主分数更贴近右上角，减少偏移
+        const FIX_RIGHT_MARGIN = Math.max(36, Math.min(80, w * 0.06)); // 约 45px@750, 65px@1080
+        const FIX_TOP_MARGIN   = Math.max(60, Math.min(120, h * 0.08)); // 约 107px@1334, 187px@2340
+
         // 右上角：主分数（锚点在右上），固定边距
         if (this.mainScoreLabelNode && this.mainScoreLabelNode.isValid) {
             const ui = this.mainScoreLabelNode.getComponent(UITransform) || this.mainScoreLabelNode.addComponent(UITransform);
             ui.setAnchorPoint(1, 1);
             this.mainScoreLabelNode.setPosition(w * 0.5 - FIX_RIGHT_MARGIN, h * 0.5 - FIX_TOP_MARGIN, 0);
+
+            const lab = this.mainScoreLabelNode.getComponent(Label);
+            if (lab) {
+                lab.fontSize = Math.round(36 * scale);
+                lab.lineHeight = Math.round(40 * scale);
+            }
         }
 
         // 顶部中间略下：层数（保持原来的大致位置，但也采用固定距离，避免和主分数耦合）
         if (this.subLayerLabelNode && this.subLayerLabelNode.isValid) {
             const ui = this.subLayerLabelNode.getComponent(UITransform) || this.subLayerLabelNode.addComponent(UITransform);
             ui.setAnchorPoint(0.5, 1);
-            // 固定从顶部向下 22% 画面高度（比“中上部”更稳，不会与主分数冲突）
-            const fixedUpperY = h * 0.28;
+            // 固定从顶部向下约 18%~22% 高度，位置略微上移
+            const fixedUpperY = h * Math.max(0.18, Math.min(0.22, 0.20 * scale + 0.01));
             this.subLayerLabelNode.setPosition(0, h * 0.5 - fixedUpperY, 0);
+
+            const lab = this.subLayerLabelNode.getComponent(Label);
+            if (lab) {
+                lab.fontSize = Math.round(48 * scale);
+                lab.lineHeight = Math.round(52 * scale);
+            }
         }
     }
 
     // 确保存在 Canvas 与 UI 相机，并在其下创建两个 Label
     private _ensureCanvasAndLabels(): void {
+        if (!this._isAlive(this.node)) return;
         // 1) 获取/创建 Canvas 根
         let canvas = director.getScene()?.getChildByName('Canvas');
         if (!canvas) {
@@ -395,20 +538,40 @@ export class StackGame extends Component {
             this.comboBadgeNode = n;
             this._rememberBaseScale(this.comboBadgeNode);
         }
+        // 6) 交给 FriendRankView 统一创建/布局好友榜入口
+        FriendRankView.ensureButton(canvas);
         // —— 自动适配布局 ——
         this._applyUILayout();
     }
 
     // 创建并显示开始遮罩 + 按钮（纯代码UI）
     private _ensureStartOverlay(): void {
-        if (!this.uiCanvas) return;
+        if (!this._isAlive(this.uiCanvas)) return;
         if (this.startOverlayNode && this.startOverlayNode.isValid) return;
+
+        // 获取当前可见分辨率，用于缩放 UI
+        let sw = 750, sh = 1334;
+        try {
+            const vs = view.getVisibleSize();
+            if (vs && vs.width > 0 && vs.height > 0) { sw = vs.width; sh = vs.height; }
+        } catch {}
+        if ((!sw || !sh) && this.uiCanvas && this.uiCanvas.isValid) {
+            const cvs = this.uiCanvas.getComponent(UITransform);
+            if (cvs) { sw = cvs.contentSize.width; sh = cvs.contentSize.height; }
+        }
+        if (!sw || !sh) {
+            sw = screen?.windowSize?.width ?? 750;
+            sh = screen?.windowSize?.height ?? 1334;
+        }
+        const baseW = 750, baseH = 1334;
+        // 收紧缩放范围，避免文字忽大忽小
+        const uiScale = Math.max(0.65, Math.min(0.95, Math.min(sw / baseW, sh / baseH)));
 
         const n = new Node('StartOverlay');
         n.layer = Layers.Enum.UI_2D;
         // 给根节点加 UITransform 以参与 UI 事件命中与相机排序
         const nUI = n.addComponent(UITransform);
-        nUI.setContentSize(2000, 2000); // 撑满屏幕（Canvas 会自适配）
+        nUI.setContentSize(sw, sh); // 用当前可见分辨率撑满
         const op = n.addComponent(UIOpacity);
         op.opacity = 0; // 先透明，稍后淡入
         n.setPosition(0, 0, 0);
@@ -417,45 +580,58 @@ export class StackGame extends Component {
         const title = new Node('Title');
         title.layer = Layers.Enum.UI_2D;
         const tUI = title.addComponent(UITransform);
-        tUI.setContentSize(800, 120);
+        tUI.setContentSize(820 * uiScale, 200 * uiScale);
         const tLab = title.addComponent(Label);
         tLab.string = '方块堆堆高';
-        tLab.fontSize = 96;
-        tLab.lineHeight = 96;
+        tLab.fontSize = Math.round(50 * uiScale);
+        tLab.lineHeight = Math.round(60 * uiScale);
+        tLab.overflow = Label.Overflow.RESIZE_HEIGHT;
         tLab.color = new Color(255, 255, 255, 255);
-        title.setPosition(0, 140, 0);
+        title.setPosition(0, sh * 0.12, 0);
         n.addChild(title);
 
         // “点击开始 / Press Space” 按钮（文字按钮）
         const btn = new Node('StartButton');
         btn.layer = Layers.Enum.UI_2D;
         const bUI = btn.addComponent(UITransform);
-        bUI.setContentSize(700, 100);
+        bUI.setContentSize(540 * uiScale, 84 * uiScale);
         const bLab = btn.addComponent(Label);
         bLab.string = '点击开始';
-        bLab.fontSize = 40;
-        bLab.lineHeight = 44;
-        bLab.color = new Color(255, 255, 255, 255);
-        btn.setPosition(0, 30, 0);
+        bLab.fontSize = Math.round(38 * uiScale);
+        bLab.lineHeight = Math.round(46 * uiScale);
+        bLab.color = new Color(180, 220, 255, 255); // 柔和蓝色，贴合背景且保持可读
+        btn.setPosition(0, sh * 0.05, 0); // 上移靠近中心
         n.addChild(btn);
 
         // 防止点击按钮时也把事件传到全局 TOUCH_START（避免第一下就落块）
         btn.on(Input.EventType.TOUCH_START, (evt: any) => {
-            if (evt && evt.stopPropagation) evt.stopPropagation();
-            this._beginGameFromStartOverlay();
+            evt?.stopPropagationImmediate?.();
+            evt?.stopPropagation?.();
         }, this);
         btn.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
-            if (evt && evt.stopPropagation) evt.stopPropagation();
-            this._beginGameFromStartOverlay();
+            evt?.stopPropagationImmediate?.();
+            evt?.stopPropagation?.();
+        }, this);
+        btn.on(Input.EventType.TOUCH_END, (evt: any) => {
+            evt?.stopPropagationImmediate?.();
+            evt?.stopPropagation?.();
+            this._handleStartTap();
+        }, this);
+        btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+            evt?.stopPropagationImmediate?.();
+            evt?.stopPropagation?.();
+            this._handleStartTap();
         }, this);
 
         // （可选）开始界面的排行榜：默认不显示
         if (this.showLeaderboardOnStart) {
-            this._injectLeaderboard(n, -120);
+            this._injectLeaderboard(n, -200);
         }
 
         this.uiCanvas.addChild(n);
         this.startOverlayNode = n;
+        // 让好友榜按钮浮在遮罩之上，便于点击
+        FriendRankView.bringButtonToFront(this.uiCanvas);
 
         // 淡入
         tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
@@ -463,13 +639,18 @@ export class StackGame extends Component {
         // 整个遮罩可点开始
         if (this.startOnTap) {
             n.on(Input.EventType.TOUCH_START, (evt: any) => {
-                if (evt && evt.stopPropagation) evt.stopPropagation();
+                // 如果点在好友榜按钮上，则不处理开始
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagationImmediate?.();
+                evt?.stopPropagation?.();
                 (evt as any)?.preventSwallow && ((evt as any).preventSwallow = false); // 兼容处理，无副作用
-                this._beginGameFromStartOverlay();
+                this._handleStartTap();
             }, this);
             n.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
-                if (evt && evt.stopPropagation) evt.stopPropagation();
-                this._beginGameFromStartOverlay();
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagationImmediate?.();
+                evt?.stopPropagation?.();
+                this._handleStartTap();
             }, this);
         }
     }
@@ -483,6 +664,14 @@ export class StackGame extends Component {
             const op = this.comboBadgeNode.getComponent(UIOpacity) || this.comboBadgeNode.addComponent(UIOpacity);
             op.opacity = 0;
         }
+    }
+
+    private _handleStartTap(): void {
+        if (!this.isWaitingStart) return;
+        if (this._requestingStartProfile) return;
+        this._requestingStartProfile = true;
+        this._beginGameFromStartOverlay();
+        this._requestingStartProfile = false;
     }
 
     private _hideStartOverlay(): void {
@@ -529,19 +718,20 @@ export class StackGame extends Component {
 
     // 刷新两个 Label 的显示
     private _refreshScoreLabels(): void {
-        if (this.mainScoreLabelNode) {
+        if (!this._isAlive(this.node)) return;
+        if (this._isAlive(this.mainScoreLabelNode)) {
             const lab = this.mainScoreLabelNode.getComponent(Label);
-            if (lab) lab.string = String(this.points);
+            if (lab && lab.isValid && this._isAlive(lab.node)) lab.string = String(this.points);
         }
-        if (this.subLayerLabelNode) {
+        if (this._isAlive(this.subLayerLabelNode)) {
             const lab = this.subLayerLabelNode.getComponent(Label);
-            if (lab) lab.string = String(this.score);
+            if (lab && lab.isValid && this._isAlive(lab.node)) lab.string = String(this.score);
         }
     }
 
     // 在主分数附近显示 “+N” 飘字并淡出
     private _showFloatScore(gained: number, wasPerfect: boolean): void {
-        if (!this.uiCanvas) return;
+        if (!this._isAlive(this.uiCanvas) || !this._isAlive(this.node)) return;
         const n = new Node('ScoreFloat');
         n.layer = Layers.Enum.UI_2D;
 
@@ -571,7 +761,7 @@ export class StackGame extends Component {
         op.opacity = 255;
 
         // —— 随机化：起点偏移 / 初始缩放 / 上飘高度 ——
-        const basePos = this.mainScoreLabelNode ? this.mainScoreLabelNode.position.clone() : new Vec3(0, 300, 0);
+        const basePos = this._isAlive(this.mainScoreLabelNode) ? this.mainScoreLabelNode.position.clone() : new Vec3(0, 300, 0);
         const jitterX = (Math.random() * 12 - 6);   // ±6 px
         const jitterY = (Math.random() * 8 - 4);    // ±4 px
         const start = new Vec3(basePos.x + jitterX, basePos.y + jitterY, basePos.z);
@@ -607,7 +797,7 @@ export class StackGame extends Component {
     }
 
     private _updateComboBadge(): void {
-        if (!this.uiCanvas) return;
+        if (!this._isAlive(this.uiCanvas)) return;
         if (!this.comboBadgeNode || !this.comboBadgeNode.isValid) return;
         const combo = this.comboCount;
         const op = this.comboBadgeNode.getComponent(UIOpacity) || this.comboBadgeNode.addComponent(UIOpacity);
@@ -933,6 +1123,12 @@ export class StackGame extends Component {
     }
 
     start() {
+        // 复活状态初始化
+        this._reviveCount = 0;
+        this._reviveRequesting = false;
+        this._gameOverFinalized = false;
+        this._reviveOverlayNode = null;
+
         // 随机化 baseHueOffset，每次开局随机色系
         this.baseHueOffset = Math.floor(Math.random() * 36) * 10;
 
@@ -963,6 +1159,16 @@ export class StackGame extends Component {
         // 解决浏览器自动播放策略：等用户首次交互后再启动 BGM
         this._bindUserGestureForBGM();
 
+        // 记录编辑器里的相机初始位置，后续抬升只改 Y，避免覆盖你的 X/Z 设置
+        if (this.cameraNode) {
+            this._cameraBasePos = this.cameraNode.position.clone();
+            this._cameraBaseEuler = this.cameraNode.eulerAngles.clone();
+            const camComp = this.cameraNode.getComponent(Camera);
+            if (camComp) {
+                this._cameraBaseOrtho = camComp.orthoHeight;
+            }
+        }
+
         // 初始化 UI 与分数
         this.points = 0;
         this.score = 0;
@@ -982,15 +1188,19 @@ export class StackGame extends Component {
         if (sys.platform === sys.Platform.WECHAT_GAME) {
             const wxAny: any = (window as any).wx;
             wxAny?.onHide?.(() => {
+                if (!this.isValid) return;
                 this.bgmSource?.pause();
                 director.pause();
             });
             wxAny?.onShow?.(() => {
+                if (!this.isValid) return;
                 director.resume();
                 if (this._bgmStarted && this.bgmSource?.isValid) {
                     this.bgmSource.play();
                 }
             });
+            this._initWechatShare();
+            this._ensureRewardedAd();
         }
 
         // Spawn the first moving block using unified logic
@@ -1003,6 +1213,13 @@ export class StackGame extends Component {
         input.on(Input.EventType.KEY_DOWN, this._onKeyDown, this);
     }
 
+    onDisable() {
+        // 停止定时器和 UI 动画，避免在节点被禁用/销毁后继续触发微信原生视图
+        this.unscheduleAllCallbacks();
+        const toStop = [this.node, this.uiCanvas, this.startOverlayNode, this.gameOverOverlayNode, this._reviveOverlayNode, this.comboBadgeNode];
+        toStop.forEach(n => { if (n && n.isValid) Tween.stopAllByTarget(n); });
+    }
+
     onDestroy() {
         input.off(Input.EventType.KEY_DOWN, this._onKeyDown, this);
         input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
@@ -1010,16 +1227,22 @@ export class StackGame extends Component {
         if (this.bgmSource && this.bgmSource.isValid) {
             this.bgmSource.stop();
         }
+        this.onDisable();
+        const toDispose = [this.startOverlayNode, this.gameOverOverlayNode, this._reviveOverlayNode];
+        toDispose.forEach(n => {
+            if (n && n.isValid) {
+                n.removeFromParent();
+                n.destroy();
+            }
+        });
+        this.startOverlayNode = null;
+        this.gameOverOverlayNode = null;
+        this._reviveOverlayNode = null;
+        this._leaderboardViews = [];
     }
 
     // ===== Leaderboard (UI helpers) =====
-    // Simple left-pad helper to avoid relying on String.padStart (ES2017)
-    private _pad(value: number | string, len: number, ch: string = ' '): string {
-        let s = String(value);
-        while (s.length < len) s = ch + s;
-        return s;
-    }
-    private _readLeaderboard(): { points:number; layers:number; date:number }[] {
+    private _readLeaderboard(): LeaderboardEntry[] {
         try {
             const raw = sys.localStorage.getItem(LB_KEY);
             const list = raw ? JSON.parse(raw) : [];
@@ -1031,113 +1254,559 @@ export class StackGame extends Component {
         } catch { return []; }
     }
 
+    private _updateLeaderboardRows(rows: LeaderboardRowRefs[], data: LeaderboardEntry[]): void {
+        for (let i = 0; i < rows.length; i++) {
+            const refs = rows[i];
+            if (!refs) continue;
+            // 任一标签无效则跳过，防止销毁后的节点被更新
+            if (!this._isAlive(refs.rankLabel?.node) || !this._isAlive(refs.pointsLabel?.node) || !this._isAlive(refs.layersLabel?.node)) {
+                continue;
+            }
+            const entry = data[i];
+            refs.rankLabel.string = `${i + 1}.`;
+            if (!entry) {
+                refs.pointsLabel.string = '--';
+                refs.layersLabel.string = '--';
+                refs.pointsLabel.color = new Color(200, 200, 200, 160);
+                refs.layersLabel.color = new Color(200, 200, 200, 160);
+                if (refs.crownNode && this._isAlive(refs.crownNode)) refs.crownNode.active = false;
+                continue;
+            }
+            refs.pointsLabel.string = String(entry.points);
+            refs.layersLabel.string = String(entry.layers);
+            refs.pointsLabel.color = new Color(255, 255, 255, 255);
+            refs.layersLabel.color = new Color(255, 255, 255, 220);
+            if (refs.crownNode && this._isAlive(refs.crownNode)) refs.crownNode.active = i === 0;
+        }
+    }
 
-    private _injectLeaderboard(root: Node, startY: number = -180): void {
+    private _registerLeaderboardView(root: Node, rows: LeaderboardRowRefs[]): void {
+        if (!this._isAlive(root)) return;
+        this._leaderboardViews = this._leaderboardViews.filter(view => view.root && view.root.isValid);
+        const existing = this._leaderboardViews.find(view => view.root === root);
+        if (existing) {
+            existing.rows = rows;
+        } else {
+            this._leaderboardViews.push({ root, rows });
+        }
+    }
+
+    private _refreshLeaderboardViews(): void {
+        const data = this._readLeaderboard();
+        this._leaderboardViews = this._leaderboardViews.filter(view => view.root && view.root.isValid);
+        for (const view of this._leaderboardViews) {
+            if (!view.rows || !view.rows.length || !this._isAlive(view.root)) continue;
+            this._updateLeaderboardRows(view.rows, data);
+        }
+    }
+
+    // 将成绩写入微信关系链存储，供开放数据域好友榜读取；非微信环境直接跳过
+    private _syncWxFriendStorage(): void {
+        if (typeof wx === 'undefined') return;
+        const pts = Math.max(0, Math.floor(this.points));
+        const layers = Math.max(0, Math.floor(this.score));
+        try {
+            wx.setUserCloudStorage({
+                KVDataList: [
+                    { key: 'points', value: String(pts) },
+                    { key: 'layers', value: String(layers) },
+                ],
+                success: () => {
+                    if (this.debugLogScores) {
+                        console.log('[StackGame] setUserCloudStorage ok', pts, layers);
+                    }
+                },
+                fail: (err: any) => {
+                    if (this.debugLogScores) {
+                        console.warn('[StackGame] setUserCloudStorage failed', err);
+                    }
+                },
+            });
+        } catch (err) {
+            if (this.debugLogScores) {
+                console.warn('[StackGame] setUserCloudStorage threw', err);
+            }
+        }
+    }
+
+    private _appendLocalLeaderboard(points: number, layers: number): void {
+        try {
+            const raw = sys.localStorage.getItem(LB_KEY);
+            const list: LeaderboardEntry[] = raw ? JSON.parse(raw) : [];
+            const nickname = this._profileCache?.nickName?.trim() || '本地玩家';
+            const avatarUrl = this._profileCache?.avatarUrl || '';
+            const entry: LeaderboardEntry = {
+                points: Math.max(0, Math.floor(points)),
+                layers: Math.max(0, Math.floor(layers)),
+                date: Date.now(),
+                nickname,
+                avatarUrl,
+            };
+            if (Array.isArray(list)) {
+                list.push(entry);
+                list.sort((a, b) => (b.points - a.points) || (b.layers - a.layers) || (b.date - a.date));
+                sys.localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, 20)));
+            } else {
+                sys.localStorage.setItem(LB_KEY, JSON.stringify([entry]));
+            }
+        } catch (err) {
+            if (this.debugLogScores) {
+                console.warn('[StackGame] save local leaderboard failed', err);
+            }
+        }
+        this._refreshLeaderboardViews();
+    }
+
+    private async _ensureUserProfile(): Promise<{ nickName: string; avatarUrl: string } | null> {
+        if (this._profileCache) return this._profileCache;
+        const wxAny: any =
+          (typeof window !== 'undefined' ? (window as any).wx : undefined) ||
+          (typeof wx !== 'undefined' ? wx : undefined);
+        if (!wxAny?.getUserProfile) return null;
+        try {
+            const profile = await new Promise<{ nickName: string; avatarUrl: string }>((resolve, reject) => {
+                wxAny.getUserProfile({
+                    desc: '用于展示排行榜',
+                    success: (res: any) => resolve({
+                        nickName: res?.userInfo?.nickName ?? '',
+                        avatarUrl: res?.userInfo?.avatarUrl ?? '',
+                    }),
+                    fail: reject,
+                });
+            });
+            this._profileCache = profile;
+            return profile;
+        } catch (err) {
+            console.warn('[StackGame] getUserProfile failed', err);
+            return null;
+        }
+    }
+
+    private _injectLeaderboard(root: Node, startY: number = -220, scale: number = 1): void {
         if (!root || !root.isValid) return;
-        // remove old if exists
         const old = root.getChildByName('Leaderboard');
         if (old) old.destroy();
 
+        const s = Math.max(0.7, Math.min(1.1, scale));
         const listNode = new Node('Leaderboard');
         listNode.layer = Layers.Enum.UI_2D;
         const ui = listNode.addComponent(UITransform);
-        ui.setContentSize(900, 420);
+        ui.setContentSize(900 * s, 420 * s);
         listNode.setPosition(0, startY, 0);
         root.addChild(listNode);
-        listNode.setScale(1.2, 1.2, 1);
+        listNode.setScale(1.0 * s, 1.0 * s, 1);
 
-        // title
         const title = new Node('LBTitle');
         title.layer = Layers.Enum.UI_2D;
-        title.addComponent(UITransform).setContentSize(800, 40);
-        const tLab = title.addComponent(Label);
-        tLab.string = '排行榜';
-        tLab.fontSize = 32; tLab.lineHeight = 36;
-        tLab.color = new Color(255,255,255,235);
-        title.setPosition(0, 150, 0);
+        title.addComponent(UITransform).setContentSize(800 * s, 40 * s);
+        const titleLab = title.addComponent(Label);
+        titleLab.string = '本地排行榜';
+        titleLab.fontSize = Math.round(40 * s);
+        titleLab.lineHeight = Math.round(46 * s);
+        titleLab.color = new Color(255, 255, 255, 235);
+        title.setPosition(0, 180 * s, 0);
         listNode.addChild(title);
 
-        // column layout (centered around listNode's origin)
-        const colRankX   = -80;  // rank column right-aligned (紧凑)
-        const colPointsX =  -0;  // points column right-aligned (紧凑)
-        const colLayersX =   80;  // layers column right-aligned (紧凑)
+        const colRankX = -110 * s;
+        const colScoreX = 0;
+        const colLayerX = 110 * s;
+        const rowH = 34 * s;
+        const rows: LeaderboardRowRefs[] = [];
 
-        const list = this._readLeaderboard();
-        const rowH = 40;
         for (let i = 0; i < 10; i++) {
-            const row = new Node(`Row${i+1}`);
+            const row = new Node(`Row${i + 1}`);
             row.layer = Layers.Enum.UI_2D;
-            row.addComponent(UITransform).setContentSize(900, rowH);
-            row.setPosition(0, 80 - i * rowH, 0);
+            row.addComponent(UITransform).setContentSize(860 * s, rowH);
+            row.setPosition(0, 95 * s - i * rowH, 0);
             listNode.addChild(row);
 
-            const e = list[i];
             const isTop3 = i < 3;
-            const fs = isTop3 ? 38 : 30;
-            const lh = isTop3 ? 44 : 36;
+            const fontSize = isTop3 ? Math.round(30 * s) : Math.round(24 * s);
+            const lineHeight = isTop3 ? Math.round(34 * s) : Math.round(30 * s);
 
-            // Rank (right aligned)
             const rankNode = new Node('Rank');
             rankNode.layer = Layers.Enum.UI_2D;
-            rankNode.addComponent(UITransform).setContentSize(120, rowH);
+            rankNode.addComponent(UITransform).setContentSize(200 * s, rowH);
             const rankLab = rankNode.addComponent(Label);
-            rankLab.string = `${i+1}.`;
-            rankLab.fontSize = fs; rankLab.lineHeight = lh;
-            rankLab.color = e ? new Color(255,255,255,255) : new Color(200,200,200,120);
-            (rankLab as any).horizontalAlign = 2; // RIGHT
+            rankLab.fontSize = fontSize;
+            rankLab.lineHeight = lineHeight;
+            (rankLab as any).horizontalAlign = 2;
             rankNode.setPosition(colRankX, 0, 0);
             row.addChild(rankNode);
 
-            // Points (right aligned)
             const ptsNode = new Node('Points');
             ptsNode.layer = Layers.Enum.UI_2D;
-            ptsNode.addComponent(UITransform).setContentSize(160, rowH);
+            ptsNode.addComponent(UITransform).setContentSize(220 * s, rowH);
             const ptsLab = ptsNode.addComponent(Label);
-            ptsLab.string = e ? String(e.points) : '';
-            ptsLab.fontSize = fs; ptsLab.lineHeight = lh;
-            ptsLab.color = e ? new Color(255,255,255,255) : new Color(200,200,200,120);
-            (ptsLab as any).horizontalAlign = 2; // RIGHT
-            ptsNode.setPosition(colPointsX, 0, 0);
+            ptsLab.fontSize = fontSize;
+            ptsLab.lineHeight = lineHeight;
+            (ptsLab as any).horizontalAlign = 2;
+            ptsNode.setPosition(colScoreX, 0, 0);
             row.addChild(ptsNode);
 
-            // Crown for #1
+            let crownNode: Node | undefined;
             if (i === 0) {
-                const crown = new Node('Crown');
-                crown.layer = Layers.Enum.UI_2D;
-                crown.addComponent(UITransform).setContentSize(40, 28);
-                const crownLab = crown.addComponent(Label);
+                crownNode = new Node('Crown');
+                crownNode.layer = Layers.Enum.UI_2D;
+                crownNode.addComponent(UITransform).setContentSize(36 * s, 22 * s);
+                const crownLab = crownNode.addComponent(Label);
                 crownLab.string = '👑';
-                crownLab.fontSize = isTop3 ? 26 : 22;
-                crownLab.lineHeight = lh;
-                crownLab.color = new Color(255, 215, 0, 255); // gold
-                // place slightly above the points column, centered horizontally
-                crown.setPosition(colPointsX+120, rowH * 0.1, 0);
-                row.addChild(crown);
+                crownLab.fontSize = Math.round(22 * s);
+                crownLab.lineHeight = lineHeight;
+                crownLab.color = new Color(255, 215, 0, 255);
+                crownNode.setPosition(colScoreX + 130 * s, rowH * 0.1, 0);
+                row.addChild(crownNode);
             }
 
-            // Layers (right aligned)
-            const layNode = new Node('Layers');
-            layNode.layer = Layers.Enum.UI_2D;
-            layNode.addComponent(UITransform).setContentSize(120, rowH);
-            const layLab = layNode.addComponent(Label);
-            layLab.string = e ? String(e.layers) : '';
-            layLab.fontSize = fs; layLab.lineHeight = lh;
-            layLab.color = e ? new Color(255,255,255,255) : new Color(200,200,200,120);
-            (layLab as any).horizontalAlign = 2; // RIGHT
-            layNode.setPosition(colLayersX, 0, 0);
-            row.addChild(layNode);
+            const layerNode = new Node('Layers');
+            layerNode.layer = Layers.Enum.UI_2D;
+            layerNode.addComponent(UITransform).setContentSize(220 * s, rowH);
+            const layerLab = layerNode.addComponent(Label);
+            layerLab.fontSize = fontSize;
+            layerLab.lineHeight = lineHeight;
+            (layerLab as any).horizontalAlign = 2;
+            layerNode.setPosition(colLayerX, 0, 0);
+            row.addChild(layerNode);
+
+            rows.push({ rankLabel: rankLab, pointsLabel: ptsLab, layersLabel: layerLab, crownNode });
+        }
+
+        this._registerLeaderboardView(root, rows);
+        this._updateLeaderboardRows(rows, this._readLeaderboard());
+    }
+
+    // —— 复活 & 激励视频 —— 
+    private _getWx(): any {
+        if (typeof wx !== 'undefined') return wx as any;
+        if (typeof window !== 'undefined') return (window as any).wx;
+        return undefined;
+    }
+
+    private _initWechatShare(): void {
+        if (sys.platform !== sys.Platform.WECHAT_GAME) return;
+        const wxAny = this._getWx();
+        if (!wxAny?.showShareMenu) return;
+        try {
+            // 打开转发和朋友圈入口。复制链接能力当前由平台控制，小游戏只能使用官方菜单。
+            wxAny.showShareMenu({
+                withShareTicket: true,
+                menus: ['shareAppMessage', 'shareTimeline']
+            });
+            const payload = () => ({
+                title: this.shareTitle || '方块堆堆高',
+                imageUrl: this.shareImageUrl || undefined,
+                query: this.shareQuery || ''
+            });
+            wxAny.onShareAppMessage?.(() => payload());
+            wxAny.onShareTimeline?.(() => payload());
+        } catch (err) {
+            console.warn('[Share] init share failed', err);
+        }
+    }
+
+    private _ensureRewardedAd(): void {
+        if (!this.enableReviveAd) return;
+        if (this._rewardedAd) return;
+        if (!this.reviveAdUnitId) return;
+        if (sys.platform !== sys.Platform.WECHAT_GAME) return;
+        const wxAny = this._getWx();
+        if (!wxAny?.createRewardedVideoAd) return;
+        try {
+            const ad = wxAny.createRewardedVideoAd({ adUnitId: this.reviveAdUnitId });
+            ad.onError?.((err: any) => {
+                console.warn('[ReviveAd] create/load error', err);
+            });
+            this._rewardedAd = ad;
+        } catch (err) {
+            console.warn('[ReviveAd] createRewardedVideoAd failed', err);
+        }
+    }
+
+    private _canOfferRevive(): boolean {
+        if (!this.enableReviveAd) return false;
+        if (this._reviveCount >= this.reviveMaxTimes) return false;
+        if (this._gameOverFinalized) return false;
+        if (sys.platform === sys.Platform.WECHAT_GAME) {
+            this._ensureRewardedAd();
+            return !!(this.reviveAdUnitId && this._rewardedAd);
+        }
+        return this.mockReviveInEditor; // 非微信环境：仅用于编辑器/浏览器调试
+    }
+
+    private _showRewardedVideoAd(): Promise<boolean> {
+        // 编辑器/浏览器环境：直接模拟成功，方便联调
+        if (sys.platform !== sys.Platform.WECHAT_GAME) {
+            return new Promise((resolve) => {
+                this.scheduleOnce(() => {
+                    if (!this.isValid) { resolve(false); return; }
+                    resolve(true);
+                }, 0.3);
+            });
+        }
+        return new Promise((resolve) => {
+            const ad = this._rewardedAd;
+            if (!ad) {
+                resolve(false);
+                return;
+            }
+            const cleanup = () => {
+                ad.offClose?.(onClose);
+                ad.offError?.(onError);
+            };
+            const onClose = (res: any) => {
+                cleanup();
+                const completed = res?.isEnded !== false;
+                resolve(completed);
+            };
+            const onError = (err: any) => {
+                console.warn('[ReviveAd] show error', err);
+                cleanup();
+                resolve(false);
+            };
+            ad.onClose?.(onClose);
+            ad.onError?.(onError);
+            ad.show?.().catch(() => {
+                ad.load?.().then(() => ad.show?.().catch(onError)).catch(onError);
+            });
+        });
+    }
+
+    private _hideReviveOverlay(): void {
+        if (!this._reviveOverlayNode || !this._reviveOverlayNode.isValid) return;
+        const op = this._reviveOverlayNode.getComponent(UIOpacity) || this._reviveOverlayNode.addComponent(UIOpacity);
+        tween(op)
+            .to(0.12, { opacity: 0 }, { easing: 'quadIn' })
+            .call(() => {
+                if (this._reviveOverlayNode && this._reviveOverlayNode.isValid) {
+                    this._reviveOverlayNode.removeFromParent();
+                    this._reviveOverlayNode.destroy();
+                    this._reviveOverlayNode = null;
+                }
+            })
+            .start();
+    }
+
+    private _showReviveOverlay(): void {
+        if (!this._canOfferRevive()) {
+            this._finalizeGameOver();
+            return;
+        }
+        this._ensureCanvasAndLabels();
+        if (!this._isAlive(this.uiCanvas)) return;
+        if (this._reviveOverlayNode && this._reviveOverlayNode.isValid) return;
+
+        const n = new Node('ReviveOverlay');
+        n.layer = Layers.Enum.UI_2D;
+        const ui = n.addComponent(UITransform);
+        // 适配当前分辨率
+        let sw = 750, sh = 1334;
+        try {
+            const vs = view.getVisibleSize();
+            if (vs && vs.width > 0 && vs.height > 0) { sw = vs.width; sh = vs.height; }
+        } catch {}
+        if (!sw || !sh) {
+            sw = screen?.windowSize?.width ?? 750;
+            sh = screen?.windowSize?.height ?? 1334;
+        }
+        const baseW = 750, baseH = 1334;
+        const uiScale = Math.max(0.55, Math.min(1.05, Math.min(sw / baseW, sh / baseH)));
+
+        // —— Revive overlay layout (unified vertical rhythm) ——
+        const groupY = sh * 0.03;              // 整组略上，保证整体居中偏上
+        const gapWatchSkip = 60 * uiScale;     // 主-次按钮间距
+        const watchY = groupY + 120 * uiScale; // 主按钮基准
+        const skipY  = watchY - (40 * uiScale) - gapWatchSkip;
+
+        ui.setContentSize(sw, sh);
+        const op = n.addComponent(UIOpacity);
+        op.opacity = 0;
+        n.setPosition(0, 0, 0);
+
+        const btnWatch = new Node('WatchAd');
+        btnWatch.layer = Layers.Enum.UI_2D;
+        btnWatch.addComponent(UITransform).setContentSize(720 * uiScale, 90 * uiScale);
+        const wLab = btnWatch.addComponent(Label);
+        wLab.string = '观看广告并复活';
+        wLab.fontSize = Math.round(32 * uiScale);
+        wLab.lineHeight = Math.round(40 * uiScale);
+        wLab.color = new Color(120, 255, 210, 255); // 清新的薄荷绿
+        btnWatch.setPosition(0, watchY, 0);
+        n.addChild(btnWatch);
+
+        const btnSkip = new Node('GiveUp');
+        btnSkip.layer = Layers.Enum.UI_2D;
+        btnSkip.addComponent(UITransform).setContentSize(720 * uiScale, 84 * uiScale);
+        const sLab = btnSkip.addComponent(Label);
+        sLab.string = '直接结算';
+        sLab.fontSize = Math.round(32 * uiScale);
+        sLab.lineHeight = Math.round(40 * uiScale);
+        sLab.color = new Color(205, 218, 240, 190); // 温和次要色
+        btnSkip.setPosition(0, skipY, 0);
+        n.addChild(btnSkip);
+
+        // 交互
+        btnWatch.on(Input.EventType.TOUCH_END, (evt: any) => { evt?.stopPropagation?.(); this._handleReviveWatch(); }, this);
+        btnWatch.on(Input.EventType.MOUSE_UP, (evt: any) => { evt?.stopPropagation?.(); this._handleReviveWatch(); }, this);
+        btnSkip.on(Input.EventType.TOUCH_END, (evt: any) => { evt?.stopPropagation?.(); this._finalizeGameOver(); }, this);
+        btnSkip.on(Input.EventType.MOUSE_UP, (evt: any) => { evt?.stopPropagation?.(); this._finalizeGameOver(); }, this);
+
+        this.uiCanvas.addChild(n);
+        this._reviveOverlayNode = n;
+        tween(op).to(0.16, { opacity: 255 }, { easing: 'quadOut' }).start();
+    }
+
+    private async _handleReviveWatch(): Promise<void> {
+        if (this._reviveRequesting) return;
+        this._reviveRequesting = true;
+        const ok = await this._showRewardedVideoAd();
+        this._reviveRequesting = false;
+        if (ok) {
+            this._reviveCount += 1;
+            this._reviveGame();
+        } else {
+            this._finalizeGameOver();
+        }
+    }
+
+    private _reviveGame(): void {
+        this._hideReviveOverlay();
+        this.isGameOver = false;
+        this._gameOverFinalized = false;
+        this.comboCount = 0;
+        this._hideComboBadge();
+        // 复活安全：如果当前顶层过薄，回填到可玩厚度
+        if (this.baseBlock && this.baseBlock.isValid && this._baseMaxX > 0 && this._baseMaxZ > 0) {
+            const cur = this.baseBlock.scale.clone();
+            const minX = this._baseMaxX * Math.max(0, Math.min(1, this.reviveMinScaleRatio));
+            const minZ = this._baseMaxZ * Math.max(0, Math.min(1, this.reviveMinScaleRatio));
+            const newX = Math.max(cur.x, minX);
+            const newZ = Math.max(cur.z, minZ);
+            if (newX !== cur.x || newZ !== cur.z) {
+                this.baseBlock.setScale(new Vec3(newX, cur.y, newZ));
+            }
+        }
+        this.movingBlock = null;
+        // 失误后重开一块新方块继续
+        this.spawnNextBlock();
+        // 若 BGM 已停，重新播放
+        if (this.bgmSource && this.bgmSource.isValid && !this.bgmSource.playing) {
+            this.bgmSource.play();
+        }
+    }
+
+    private _finalizeGameOver(): void {
+        if (this._gameOverFinalized) return;
+        this._gameOverFinalized = true;
+        this.isGameOver = true;
+        this._hideReviveOverlay();
+        // BGM 淡出
+        if (this.bgmSource && this.bgmSource.isValid) {
+            const vol = { v: this.bgmSource.volume };
+            tween(vol)
+                .to(this.bgmFadeOut, { v: 0 }, {
+                    onUpdate: () => {
+                        if (this.bgmSource && this.bgmSource.isValid) {
+                            this.bgmSource.volume = vol.v;
+                        }
+                    }
+                })
+                .call(() => {
+                    if (this.bgmSource && this.bgmSource.isValid) {
+                        this.bgmSource.stop();
+                    }
+                })
+                .start();
+        }
+        this.comboCount = 0; // 游戏结束，连击清零
+        this._hideComboBadge();
+        if (this.debugLogScores) {
+            console.log(`[GameOver] points=${this.points}  layers=${this.score}  finalSpeed=${this.moveSpeed.toFixed(2)}  combo=${this.comboCount}`);
+        }
+        // —— Minimal: 将本局成绩写入本地排行榜（仅存 device）——
+        this._appendLocalLeaderboard(this.points, this.score);
+        this._syncWxFriendStorage(); // 关系链数据：好友榜读取
+        // 延迟拉远镜头，展示整个堆叠结果
+        this.scheduleOnce(() => {
+            if (!this._isAlive(this.node) || !this._isAlive(this.cameraNode)) return;
+            // 新的拉远摄像机位置计算方式，按塔高度和比例缩放整体缩小
+            const towerHeight = (this.score + 1) * this.movingBlockHeight + this.baseBlockHeight;
+            // 动态计算 scaleRatio 以适配不同屏幕高宽比
+            const screenRatio = screen?.windowSize
+                ? screen.windowSize.height / screen.windowSize.width
+                : 2.0;
+            const idealScreenFactor = 1.0 + screenRatio * 0.5; // 越大越远，基于竖屏比例动态调整
+            const scaleRatio = idealScreenFactor;
+            const camComp = this.cameraNode.getComponent(Camera);
+            const isOrtho = !!camComp && camComp.projection === Camera.ProjectionType.ORTHO;
+            if (isOrtho && camComp) {
+                // 正交相机：拉远改为放大 orthoHeight，位置和朝向保持为初始设置
+                const baseOrtho = this._cameraBaseOrtho ?? camComp.orthoHeight;
+                const targetOrtho = baseOrtho + towerHeight * scaleRatio * 0.4;
+                const anim = { h: camComp.orthoHeight };
+                tween(anim)
+                    .stop()
+                    .to(1.2, { h: targetOrtho }, {
+                        easing: 'cubicOut',
+                        onUpdate: () => {
+                            if (camComp && camComp.isValid) camComp.orthoHeight = anim.h;
+                        }
+                    })
+                    .start();
+            } else {
+                // 透视相机：基于场景里设置的相机位置/朝向来推远
+                const basePos = this._cameraBasePos?.clone() ?? this.cameraNode.position.clone();
+                const dir = basePos.clone();
+                if (dir.length() < 0.001) dir.set(1, 1, 1);
+                dir.normalize();
+                const baseDist = basePos.length();
+                const targetDist = baseDist + towerHeight * scaleRatio;
+                const farOffset = dir.multiplyScalar(targetDist);
+                const focusY = this.baseBlock ? (this.baseBlock.position.y + this.baseBlock.scale.y * 0.5) : 0;
+                const farCameraPos = new Vec3(farOffset.x, farOffset.y + focusY, farOffset.z);
+                const targetEuler = this._cameraBaseEuler?.clone() ?? this.cameraNode.eulerAngles.clone();
+
+                // 可选增强：防止摄像机动画冲突（如未来出问题可加）
+                // tween.stopAllByTarget(this.cameraNode);
+
+                tween(this.cameraNode)
+                    .stop()
+                    .to(1.2, {
+                        position: farCameraPos,
+                        eulerAngles: targetEuler // 保持你在场景里设定的视角角度
+                    }, { easing: 'cubicOut' })
+                    .start();
+            }
+        }, 1);
+        this._showGameOverOverlay(1.25);
+    }
+
+    private _handleFailOrRevive(): void {
+        this.isGameOver = true;
+        if (this._canOfferRevive()) {
+            this._showReviveOverlay();
+        } else {
+            this._finalizeGameOver();
         }
     }
 
     // —— GameOver 遮罩 ——
     private _ensureGameOverOverlay(): void {
-        if (!this.uiCanvas) return;
+        if (!this._isAlive(this.uiCanvas)) return;
         if (this.gameOverOverlayNode && this.gameOverOverlayNode.isValid) return;
+
+        // 适配当前分辨率，缩放标题/按钮/榜单
+        let sw = 750, sh = 1334;
+        try {
+            const vs = view.getVisibleSize();
+            if (vs && vs.width > 0 && vs.height > 0) { sw = vs.width; sh = vs.height; }
+        } catch {}
+        const baseW = 750, baseH = 1334;
+        const uiScale = Math.max(0.72, Math.min(1.0, Math.min(sw / baseW, sh / baseH)));
 
         const n = new Node('GameOverOverlay');
         n.layer = Layers.Enum.UI_2D;
         const ui = n.addComponent(UITransform);
-        ui.setContentSize(2000, 2000);
+        ui.setContentSize(sw, sh);
         const op = n.addComponent(UIOpacity);
         op.opacity = 0;
         n.setPosition(0, 0, 0);
@@ -1145,48 +1814,67 @@ export class StackGame extends Component {
         // 标题：游戏结束
         const title = new Node('Title');
         title.layer = Layers.Enum.UI_2D;
-        title.addComponent(UITransform).setContentSize(800, 120);
+        title.addComponent(UITransform).setContentSize(820 * uiScale, 120 * uiScale);
         const tLab = title.addComponent(Label);
         tLab.string = '游戏结束';
-        tLab.fontSize = 88;
-        tLab.lineHeight = 92;
+        tLab.fontSize = Math.round(60 * uiScale);
+        tLab.lineHeight = Math.round(68 * uiScale);
         tLab.color = new Color(255, 255, 255, 255);
-        title.setPosition(0, 140, 0);
+        title.setPosition(0, sh * 0.09, 0);
         n.addChild(title);
 
         // 文本按钮：点击重新开始
         const btn = new Node('RestartButton');
         btn.layer = Layers.Enum.UI_2D;
-        btn.addComponent(UITransform).setContentSize(760, 100);
+        btn.addComponent(UITransform).setContentSize(720 * uiScale, 90 * uiScale);
         const bLab = btn.addComponent(Label);
         bLab.string = '点击重新开始';
-        bLab.fontSize = 40;
-        bLab.lineHeight = 44;
+        bLab.fontSize = Math.round(30 * uiScale);
+        bLab.lineHeight = Math.round(36 * uiScale);
         bLab.color = new Color(255, 255, 255, 255);
-        btn.setPosition(0, 30, 0);
+        btn.setPosition(0, sh * 0.02, 0);
         n.addChild(btn);
 
         // Show leaderboard on GameOver overlay as well
-        this._injectLeaderboard(n, -250);
+        this._injectLeaderboard(n, -sh * 0.18, 0.9 * uiScale);
 
         this.uiCanvas.addChild(n);
         this.gameOverOverlayNode = n;
+        // 让好友榜按钮浮在结束遮罩之上，便于点击
+        FriendRankView.bringButtonToFront(this.uiCanvas);
 
         // 淡入
         tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
 
         // 点击遮罩或按钮重开（受 restartOnTap 控制）
         if (this.restartOnTap) {
-            n.on(Input.EventType.TOUCH_END, (evt: any) => { evt?.stopPropagation?.(); this._restartGame(); }, this);
-            n.on(Input.EventType.MOUSE_UP, (evt: any) => { evt?.stopPropagation?.(); this._restartGame(); }, this);
+            n.on(Input.EventType.TOUCH_END, (evt: any) => {
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagation?.();
+                this._restartGame();
+            }, this);
+            n.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagation?.();
+                this._restartGame();
+            }, this);
         } else {
-            btn.on(Input.EventType.TOUCH_END, (evt: any) => { evt?.stopPropagation?.(); this._restartGame(); }, this);
-            btn.on(Input.EventType.MOUSE_UP, (evt: any) => { evt?.stopPropagation?.(); this._restartGame(); }, this);
+            btn.on(Input.EventType.TOUCH_END, (evt: any) => {
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagation?.();
+                this._restartGame();
+            }, this);
+            btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                if (this._isEventOnFriendButton(evt)) return;
+                evt?.stopPropagation?.();
+                this._restartGame();
+            }, this);
         }
     }
 
     private _showGameOverOverlay(delaySec: number = 1.25): void {
         this.scheduleOnce(() => {
+            if (!this._isAlive(this.node)) return;
             this._ensureCanvasAndLabels();
             this._ensureGameOverOverlay();
         }, delaySec);
@@ -1224,7 +1912,7 @@ export class StackGame extends Component {
             console.log('[DEBUG] comboCount reset to 0');
         }
         if (event.keyCode === KeyCode.SPACE || event.keyCode === KeyCode.ENTER) {
-            if (this.isWaitingStart) this._beginGameFromStartOverlay();
+            if (this.isWaitingStart) this._handleStartTap();
         }
         // GameOver 后快捷键：Space / Enter / N 立即重开
         if (this.isGameOver && (event.keyCode === KeyCode.SPACE || event.keyCode === KeyCode.ENTER || event.keyCode === KeyCode.KEY_N)) {
@@ -1338,7 +2026,7 @@ export class StackGame extends Component {
 
     onTouchStart() {
         if (this.isWaitingStart) { 
-            this._beginGameFromStartOverlay(); 
+            this._handleStartTap(); 
             return; 
         }
         if (this.isGameOver) return;
@@ -1497,73 +2185,8 @@ export class StackGame extends Component {
                     })
                     .start();
 
-                this.isGameOver = true;
-                // BGM 淡出
-                if (this.bgmSource && this.bgmSource.isValid) {
-                    const vol = { v: this.bgmSource.volume };
-                    tween(vol)
-                        .to(this.bgmFadeOut, { v: 0 }, {
-                            onUpdate: () => {
-                                if (this.bgmSource && this.bgmSource.isValid) {
-                                    this.bgmSource.volume = vol.v;
-                                }
-                            }
-                        })
-                        .call(() => {
-                            if (this.bgmSource && this.bgmSource.isValid) {
-                                this.bgmSource.stop();
-                            }
-                        })
-                        .start();
-                }
-                this.comboCount = 0; // 游戏结束，连击清零
-                this._hideComboBadge();
-                if (this.debugLogScores) {
-                    console.log(`[GameOver] points=${this.points}  layers=${this.score}  finalSpeed=${this.moveSpeed.toFixed(2)}  combo=${this.comboCount}`);
-                }
-                // —— Minimal: 将本局成绩写入本地排行榜（仅存 device）——
-                try {
-                    const raw = sys.localStorage.getItem(LB_KEY);
-                    const list = raw ? JSON.parse(raw) : [];
-                    const entry = { points: Math.max(0, Math.floor(this.points)), layers: Math.max(0, Math.floor(this.score)), date: Date.now() };
-                    if (Array.isArray(list)) {
-                        list.push(entry);
-                        list.sort((a, b) => (b.points - a.points) || (b.layers - a.layers) || (b.date - a.date));
-                        sys.localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, 20)));
-                    } else {
-                        sys.localStorage.setItem(LB_KEY, JSON.stringify([entry]));
-                    }
-                } catch {}
-                // 延迟拉远镜头，展示整个堆叠结果
-                this.scheduleOnce(() => {
-                    // 新的拉远摄像机位置计算方式，按塔高度和比例缩放整体缩小
-                    const towerHeight = (this.score + 1) * this.movingBlockHeight + this.baseBlockHeight;
-                    // 动态计算 scaleRatio 以适配不同屏幕高宽比
-                    const screenRatio = screen?.windowSize
-                        ? screen.windowSize.height / screen.windowSize.width
-                        : 2.0;
-                    const baseViewAngle = Math.sqrt(2) / 2;
-                    const idealScreenFactor = 1.8 + screenRatio * 0.5; // 越大越远，基于竖屏比例动态调整
-                    const scaleRatio = idealScreenFactor;
-
-                    const farCameraPos = new Vec3(
-                        -towerHeight * baseViewAngle * scaleRatio,
-                        towerHeight * scaleRatio,
-                        towerHeight * baseViewAngle * scaleRatio
-                    );
-
-                    // 可选增强：防止摄像机动画冲突（如未来出问题可加）
-                    // tween.stopAllByTarget(this.cameraNode);
-
-                    tween(this.cameraNode)
-                        .stop()
-                        .to(1.2, {
-                            position: farCameraPos,
-                            eulerAngles: new Vec3(-35, -45, 0) // 保证视角角度固定
-                        }, { easing: 'cubicOut' })
-                        .start();
-                }, 1);
-                this._showGameOverOverlay(1.25);
+                this.movingBlock = null;
+                this._handleFailOrRevive();
                 return;
             }
 
@@ -1620,10 +2243,11 @@ export class StackGame extends Component {
 
             // 相机抬升控制：前 cameraHoldLayers 层不抬相机，超过后再按高度上移
             if (this.score > this.cameraHoldLayers) {
-                const cameraOffset = new Vec3(-10, 11, 10);  // 初始偏移量，保持斜向视角，与初始摄像机一致
+                // 保持编辑器里的 X/Z，不用代码里的 -10/10
+                const cameraOffset = this._cameraBasePos ?? this.cameraNode.position;
                 const targetBlockY = this.baseBlock.position.y;
                 const currentBlockHeight = this.baseBlock.scale.y;
-                const targetCameraY = targetBlockY + currentBlockHeight + 10;
+                const targetCameraY = targetBlockY + currentBlockHeight + 19.5;
 
                 const newCameraPos = new Vec3(
                     cameraOffset.x,
@@ -1658,7 +2282,7 @@ export class StackGame extends Component {
 
         // 从更远处直接进入连续运动：统一从负边界外入场，方向始终朝中心（去掉入场 tween，消除“先停一下再动”的观感）
         const edge = Math.max(1, this.spawnOvershoot) * this.moveRange;
-        const startX = this.moveAxis === 'x' ? edge : retainedPos.x;   // 统一从 -edge 入场
+        const startX = this.moveAxis === 'x' ? -edge : retainedPos.x;   // 统一从 -edge 入场
         const startZ = this.moveAxis === 'z' ? -edge : retainedPos.z;   // 统一从 -edge 入场
         this._isSpawning = false; // 不再锁更新
         newBlock.setPosition(new Vec3(startX, newY, startZ));
@@ -1887,6 +2511,7 @@ export class StackGame extends Component {
 
         // 动画结束后清理
         this.scheduleOnce(() => {
+            if (!this.isValid) return;
             // 回收条带，环节点销毁即可（只是一层空壳）
             for (const s of _haloStrips) {
                 if (s && s.isValid) this._recycle(s, 'strip');
@@ -1985,6 +2610,7 @@ export class StackGame extends Component {
 
         // 收尾销毁
         this.scheduleOnce(() => {
+            if (!this.isValid) return;
             strips.forEach(n => { if (n && n.isValid) this._recycle(n, 'strip'); });
         }, dur + 0.02);
     }
@@ -1999,7 +2625,10 @@ export class StackGame extends Component {
         const punch = 0.08 + combo * 0.01;    // 0.08 → 0.14
         const shake = 0.02 + combo * 0.004;   // 0.06 → 0.084
 
-        const effect = instantiate(this.perfectEffectPrefab);
+        const effect = this._acquireEffect();
+        if (!effect) {
+            return;
+        }
         effect.setPosition(position);
         this.node.addChild(effect);
 
@@ -2027,10 +2656,8 @@ export class StackGame extends Component {
 
         // 自动销毁
         this.scheduleOnce(() => {
-            if (effect && effect.isValid) {
-                effect.removeFromParent();
-                effect.destroy();
-            }
+            if (!this.isValid) return;
+            this._recycle(effect, 'effect');
         }, duration + 0.12);
     }
 }

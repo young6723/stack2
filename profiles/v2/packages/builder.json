@@ -12,23 +12,29 @@
     "outputName": "wechatgame",
     "mainBundleCompressionType": "merge_dep",
     "platform": "wechatgame",
-    "mainBundleIsRemote": true,
+    "mainBundleIsRemote": false,
     "md5Cache": true,
-    "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com"
+    "server": "https://yfgame.cloud",
+    "scenes": [
+      {
+        "url": "db://assets/scene/game.scene",
+        "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+      }
+    ]
   },
   "BuildTaskManager": {
     "taskMap": {
-      "1756809203538": {
+      "1766671885519": {
         "type": "build",
-        "id": "1756809203538",
+        "id": "1766671885519",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-2 18:33:29 build success in 5 s!",
-        "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
+        "message": "2025-12-25 22:11:32 build success in 6 s!",
+        "detailMessage": "// ---- build task wechatgame：onAfterCopyBuildTemplate ----\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -63,13 +69,13 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-001",
+          "outputName": "wechatgame",
           "taskName": "wechatgame-001",
           "scenes": [
             {
@@ -80,22 +86,22 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-2-2025 18-33.log"
+          "logDest": "project://temp/builder/log/wechatgame12-25-2025 22-11.log"
         },
-        "time": "9-2-2025 18:33:23",
+        "time": "12-25-2025 22:11:25",
         "dirty": false
       },
-      "1756949687621": {
+      "1766719196630": {
         "type": "build",
-        "id": "1756949687621",
+        "id": "1766719196630",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-4 09:34:54 build success in 6 s!",
-        "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
+        "message": "2025-12-26 11:20:32 build success in 35 s!",
+        "detailMessage": "// ---- build task wechatgame：onBeforeCopyBuildTemplate ----\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -130,14 +136,14 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
           "outputName": "wechatgame",
-          "taskName": "wechatgame",
+          "taskName": "wechatgame-001",
           "scenes": [
             {
               "url": "db://assets/scene/game.scene",
@@ -147,22 +153,22 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-4-2025 09-34.log"
+          "logDest": "project://temp/builder/log/wechatgame12-26-2025 11-19.log"
         },
-        "time": "9-4-2025 09:34:47",
+        "time": "12-26-2025 11:19:56",
         "dirty": false
       },
-      "1756978020183": {
+      "1767606553814": {
         "type": "build",
-        "id": "1756978020183",
+        "id": "1767606553814",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-4 17:27:05 build success in 5 s!",
-        "detailMessage": "// ---- build task cocos-service：onAfterCompressSettings ----\r",
+        "message": "2026-1-5 17:49:50 build success in 36 s!",
+        "detailMessage": "builder:build-project-total (36493ms)\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -197,14 +203,14 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-002",
-          "taskName": "wechatgame-002",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
           "scenes": [
             {
               "url": "db://assets/scene/game.scene",
@@ -214,22 +220,22 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-4-2025 17-27.log"
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 17-49.log"
         },
-        "time": "9-4-2025 17:27:00",
+        "time": "1-5-2026 17:49:13",
         "dirty": false
       },
-      "1756988698742": {
+      "1767607448045": {
         "type": "build",
-        "id": "1756988698742",
+        "id": "1767607448045",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-4 20:25:04 build success in 5 s!",
+        "message": "2026-1-5 18:04:14 build success in 6 s!",
         "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -264,14 +270,14 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-003",
-          "taskName": "wechatgame-003",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
           "scenes": [
             {
               "url": "db://assets/scene/game.scene",
@@ -281,89 +287,22 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-4-2025 20-24.log"
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 18-04.log"
         },
-        "time": "9-4-2025 20:24:58",
+        "time": "1-5-2026 18:04:08",
         "dirty": false
       },
-      "1757038971051": {
+      "1767609220812": {
         "type": "build",
-        "id": "1757038971051",
+        "id": "1767609220812",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-5 10:22:57 build success in 6 s!",
-        "detailMessage": "// ---- build task cocos-service：onAfterCompressSettings ----\r",
-        "options": {
-          "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
-          "engineModulesConfigKey": "defaultConfig",
-          "platform": "wechatgame",
-          "buildPath": "project://build",
-          "debug": false,
-          "buildMode": "normal",
-          "mangleProperties": false,
-          "md5Cache": true,
-          "skipCompressTexture": false,
-          "sourceMaps": false,
-          "overwriteProjectSettings": {
-            "macroConfig": {
-              "cleanupImageCache": "on"
-            },
-            "includeModules": {
-              "physics": "inherit-project-setting",
-              "physics-2d": "inherit-project-setting",
-              "gfx-webgl2": "off"
-            }
-          },
-          "nativeCodeBundleMode": "wasm",
-          "polyfills": {
-            "asyncFunctions": false
-          },
-          "experimentalEraseModules": false,
-          "startSceneAssetBundle": false,
-          "bundleConfigs": [],
-          "inlineEnum": true,
-          "useBuiltinServer": false,
-          "md5CacheOptions": {
-            "excludes": [],
-            "includes": [],
-            "replaceOnly": [],
-            "handleTemplateMd5Link": true
-          },
-          "mainBundleIsRemote": true,
-          "mainBundleCompressionType": "merge_dep",
-          "useSplashScreen": true,
-          "bundleCommonChunk": false,
-          "packAutoAtlas": true,
-          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-004",
-          "taskName": "wechatgame-004",
-          "scenes": [
-            {
-              "url": "db://assets/scene/game.scene",
-              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
-            }
-          ],
-          "wasmCompressionMode": false,
-          "packages": {},
-          "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-5-2025 10-22.log"
-        },
-        "time": "9-5-2025 10:22:51",
-        "dirty": false
-      },
-      "1757136415363": {
-        "type": "build",
-        "id": "1757136415363",
-        "progress": 1,
-        "state": "success",
-        "stage": "build",
-        "message": "2025-9-6 13:27:01 build success in 5 s!",
+        "message": "2026-1-5 18:33:47 build success in 6 s!",
         "detailMessage": "// ---- build task 整理静态模板文件 ----\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -398,14 +337,14 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-005",
-          "taskName": "wechatgame-005",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
           "scenes": [
             {
               "url": "db://assets/scene/game.scene",
@@ -415,22 +354,22 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-6-2025 13-26.log"
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 18-33.log"
         },
-        "time": "9-6-2025 13:26:55",
+        "time": "1-5-2026 18:33:40",
         "dirty": false
       },
-      "1757220108560": {
+      "1767615379322": {
         "type": "build",
-        "id": "1757220108560",
+        "id": "1767615379322",
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "2025-9-7 12:41:54 build success in 5 s!",
-        "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
+        "message": "2026-1-5 20:16:25 build success in 6 s!",
+        "detailMessage": "// ---- build task cocos-service：onAfterCompressSettings ----\r",
         "options": {
           "name": "stack2",
-          "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com",
+          "server": "https://yfgame.cloud",
           "engineModulesConfigKey": "defaultConfig",
           "platform": "wechatgame",
           "buildPath": "project://build",
@@ -465,14 +404,14 @@
             "replaceOnly": [],
             "handleTemplateMd5Link": true
           },
-          "mainBundleIsRemote": true,
+          "mainBundleIsRemote": false,
           "mainBundleCompressionType": "merge_dep",
           "useSplashScreen": true,
           "bundleCommonChunk": false,
           "packAutoAtlas": true,
           "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
-          "outputName": "wechatgame-006",
-          "taskName": "wechatgame-006",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
           "scenes": [
             {
               "url": "db://assets/scene/game.scene",
@@ -482,9 +421,411 @@
           "wasmCompressionMode": false,
           "packages": {},
           "__version__": "1.3.9",
-          "logDest": "project://temp/builder/log/wechatgame9-7-2025 12-41.log"
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 20-16.log"
         },
-        "time": "9-7-2025 12:41:48",
+        "time": "1-5-2026 20:16:19",
+        "dirty": false
+      },
+      "1767616007932": {
+        "type": "build",
+        "id": "1767616007932",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 20:26:56 build success in 8 s!",
+        "detailMessage": "// ---- build task cocos-service：onBeforeCompressSettings ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 20-26.log"
+        },
+        "time": "1-5-2026 20:26:47",
+        "dirty": false
+      },
+      "1767617185190": {
+        "type": "build",
+        "id": "1767617185190",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 20:46:31 build success in 6 s!",
+        "detailMessage": "// ---- build task cocos-service：onAfterBuild ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 20-46.log"
+        },
+        "time": "1-5-2026 20:46:25",
+        "dirty": false
+      },
+      "1767621949600": {
+        "type": "build",
+        "id": "1767621949600",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 22:05:56 build success in 6 s!",
+        "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 22-05.log"
+        },
+        "time": "1-5-2026 22:05:49",
+        "dirty": false
+      },
+      "1767625138217": {
+        "type": "build",
+        "id": "1767625138217",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 22:59:09 build success in 11 s!",
+        "detailMessage": "// ---- build task adsense-h5g-plugin：onAfterBuild ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 22-58.log"
+        },
+        "time": "1-5-2026 22:58:58",
+        "dirty": false
+      },
+      "1767625382481": {
+        "type": "build",
+        "id": "1767625382481",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 23:03:12 build success in 10 s!",
+        "detailMessage": "// ---- build task cocos-service：onAfterBuild ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 23-03.log"
+        },
+        "time": "1-5-2026 23:03:02",
+        "dirty": false
+      },
+      "1767625551135": {
+        "type": "build",
+        "id": "1767625551135",
+        "progress": 1,
+        "state": "success",
+        "stage": "build",
+        "message": "2026-1-5 23:05:58 build success in 6 s!",
+        "detailMessage": "// ---- build task wechatgame：onAfterBuild ----\r",
+        "options": {
+          "name": "stack2",
+          "server": "https://yfgame.cloud",
+          "engineModulesConfigKey": "defaultConfig",
+          "platform": "wechatgame",
+          "buildPath": "project://build",
+          "debug": false,
+          "buildMode": "normal",
+          "mangleProperties": false,
+          "md5Cache": true,
+          "skipCompressTexture": false,
+          "sourceMaps": false,
+          "overwriteProjectSettings": {
+            "macroConfig": {
+              "cleanupImageCache": "on"
+            },
+            "includeModules": {
+              "physics": "inherit-project-setting",
+              "physics-2d": "inherit-project-setting",
+              "gfx-webgl2": "off"
+            }
+          },
+          "nativeCodeBundleMode": "wasm",
+          "polyfills": {
+            "asyncFunctions": false
+          },
+          "experimentalEraseModules": false,
+          "startSceneAssetBundle": false,
+          "bundleConfigs": [],
+          "inlineEnum": true,
+          "useBuiltinServer": false,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "mainBundleIsRemote": false,
+          "mainBundleCompressionType": "merge_dep",
+          "useSplashScreen": true,
+          "bundleCommonChunk": false,
+          "packAutoAtlas": true,
+          "startScene": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa",
+          "outputName": "wechatgame",
+          "taskName": "wechatgame-001",
+          "scenes": [
+            {
+              "url": "db://assets/scene/game.scene",
+              "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+            }
+          ],
+          "wasmCompressionMode": false,
+          "packages": {},
+          "__version__": "1.3.9",
+          "logDest": "project://temp/builder/log/wechatgame1-5-2026 23-05.log"
+        },
+        "time": "1-5-2026 23:05:51",
         "dirty": false
       }
     }

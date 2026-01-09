@@ -6,9 +6,15 @@
       "outputName": "wechatgame",
       "mainBundleCompressionType": "merge_dep",
       "platform": "wechatgame",
-      "mainBundleIsRemote": true,
+      "mainBundleIsRemote": false,
       "md5Cache": true,
-      "server": "https://stack-1317747555.cos.ap-shanghai.myqcloud.com"
+      "server": "https://yfgame.cloud",
+      "scenes": [
+        {
+          "url": "db://assets/scene/game.scene",
+          "uuid": "d6fd731a-5c24-4f75-851d-1a7a7621a1fa"
+        }
+      ]
     },
     "taskOptionsMap": {
       "1756755067559": {
@@ -98,14 +104,1214 @@
         "separateEngine": false,
         "highPerformanceMode": false,
         "__version__": "1.0.4"
+      },
+      "1762661773676": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1762748683166": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1762847588817": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1762915965061": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1762916733478": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1762995666021": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1763193001922": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1763341426133": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1763425807530": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764233165490": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764235643778": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764299671583": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764300105512": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764300419034": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764384274622": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764573912817": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764575422011": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764575852437": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764575956455": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764833524946": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764835084600": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764836137475": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764839984369": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764840363761": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764840589587": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764901209864": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764904840888": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764905192374": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764906355422": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764907114926": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764908032595": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764916765842": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764917141280": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764917371925": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764917612021": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764925215484": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764927570156": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764929230914": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764938867047": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764942796508": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1764944077189": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765080409803": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765092599229": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": false,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765204194843": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765204688012": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765769279057": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765788060355": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765790374718": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765794750305": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765803211268": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765807111308": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765810489322": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765811278501": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765811648223": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765816491750": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765856225127": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765859669430": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765871187422": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765888371027": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765888792608": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765896832458": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765900062165": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765937133708": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765938183295": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765939280182": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765939315863": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765943005477": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765943292045": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1765943588638": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766026467234": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766027397139": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766027706067": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766028482610": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766032503577": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766033054985": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766035219134": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766043089473": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766043293613": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766058497336": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766064604193": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766065229851": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766065498915": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766065620712": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766065992708": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766067343803": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766067810528": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766070568513": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766070962717": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766071064734": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766071204210": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766071931801": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766072069130": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766072214033": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766113987503": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766114945591": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766115036024": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766115299079": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766115398354": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766121951022": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766122523519": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766122829502": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766123170564": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766138743354": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766151346970": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766158146901": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766285060454": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766286409607": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766288175149": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766288582536": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766306641174": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766386180417": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766386956922": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766387562883": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766388134649": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766389643517": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766390352128": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766390778005": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766393850185": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766394596621": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766398396843": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766398713120": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766483689589": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766485543965": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766554587220": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766556491657": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766632183443": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766642232067": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766663433264": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766663716416": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766668002711": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766668314981": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766668442292": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766670928909": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671034115": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671155520": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671514440": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671705584": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671787005": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766671885519": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1766719196630": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767606553814": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767607448045": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767609220812": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767615379322": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767616007932": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767617185190": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767621949600": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767625138217": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767625382481": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767625551135": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
       }
     },
     "__version__": "1.3.9",
     "options": {
       "wechatgame": {
         "orientation": "portrait",
-        "appid": "wx6ac3f5090a6b99c5",
-        "buildOpenDataContextTemplate": false,
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
         "separateEngine": false,
         "highPerformanceMode": false,
         "__version__": "1.0.4"
