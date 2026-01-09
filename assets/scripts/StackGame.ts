@@ -114,7 +114,6 @@ export class StackGame extends Component {
     showLeaderboardOnStart: boolean = false; // 是否在开始遮罩显示排行榜（默认不显示）
     private startOverlayNode: Node = null;      // 开始遮罩根节点
     private isWaitingStart: boolean = true;     // 开局等待开始
-    private _requestingStartProfile: boolean = false;
 
     // —— GameOver Overlay ——
     @property
@@ -270,7 +269,6 @@ export class StackGame extends Component {
 
     // 连击计数：连续完美堆叠次数（非完美或失败时清零）
     private comboCount: number = 0;
-    private _isSpawning: boolean = false; // 生成入场期间暂停物理移动，避免越界反弹
 
     private _tmpPos: Vec3 = new Vec3(); // 复用的临时向量，减少 GC 抖动
     private _profileCache: { nickName: string; avatarUrl: string } | null = null;
@@ -668,10 +666,7 @@ export class StackGame extends Component {
 
     private _handleStartTap(): void {
         if (!this.isWaitingStart) return;
-        if (this._requestingStartProfile) return;
-        this._requestingStartProfile = true;
         this._beginGameFromStartOverlay();
-        this._requestingStartProfile = false;
     }
 
     private _hideStartOverlay(): void {
@@ -694,8 +689,6 @@ export class StackGame extends Component {
         this.isWaitingStart = false;
         this._hideStartOverlay();
         this._hideGameOverOverlay();
-        // 触发一次用户手势后的 BGM 初始化（你已有绑定）
-        this._bindUserGestureForBGM();
         this.spawnNextBlock();
         // 轻微提示
         if (this.mainScoreLabelNode) this._punchScale(this.mainScoreLabelNode, 0.10, 0.20);
@@ -1923,7 +1916,6 @@ export class StackGame extends Component {
     update(deltaTime: number) {
         if (this.isGameOver || !this.movingBlock) return;
         if (this.isWaitingStart) return; // 等待开始时不移动
-        if (this._isSpawning) return; // 入场过渡期间不执行往返移动
 
         const dt = Math.min(deltaTime, 1 / 30); // 避免卡帧导致的巨步长，平滑到 ~30FPS
         const range = this.moveRange;
@@ -2284,7 +2276,6 @@ export class StackGame extends Component {
         const edge = Math.max(1, this.spawnOvershoot) * this.moveRange;
         const startX = this.moveAxis === 'x' ? -edge : retainedPos.x;   // 统一从 -edge 入场
         const startZ = this.moveAxis === 'z' ? -edge : retainedPos.z;   // 统一从 -edge 入场
-        this._isSpawning = false; // 不再锁更新
         newBlock.setPosition(new Vec3(startX, newY, startZ));
 
         // 方向固定为 +1：从 -edge 往 0 移动
@@ -2620,6 +2611,10 @@ export class StackGame extends Component {
         const combo = Math.min(this.comboCount, 6);
         const threshold = this.burstComboThreshold;
         const shouldBurst = this.comboCount >= threshold;
+        // 满足阈值时按开关决定是否触发纯代码爆发特效
+        if (shouldBurst && this.useProceduralBurst) {
+            this._proceduralBurst(position, this.comboCount);
+        }
         const duration = 0.72 - combo * 0.03; // 0.72 → 0.54s
         const distance = 4.8 + combo * 0.22;  // 4.8 → 6.12
         const punch = 0.08 + combo * 0.01;    // 0.08 → 0.14

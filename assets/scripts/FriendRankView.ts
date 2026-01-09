@@ -12,6 +12,7 @@ export class FriendRankView extends Component {
     // —— Backdrop event handlers (must be stable references for off/on) —— 
     private static _onBackdropSwallow: ((e: any) => void) | null = null;
     private static _onBackdropClose: ((e: any) => void) | null = null;
+    private static _backdropColorLocked: boolean = false; // 由运行时动态颜色锁定，避免 onLoad 覆盖
 
     private static readonly _btnMarginXBase = 36;
     private static readonly _btnMarginYBase = 120; // 稍微下移，使其与右侧分数更齐平
@@ -39,8 +40,13 @@ export class FriendRankView extends Component {
         if (!this.node.getComponent(BlockInputEvents)) {
             this.node.addComponent(BlockInputEvents);
         }
-        // 记录实例颜色，供静态遮罩使用
-        FriendRankView._backdropColor = this.backdropColor ? this.backdropColor.clone() : new Color(0, 0, 0, 160);
+        // 仅在未被动态颜色锁定时才记录 Inspector 默认色，避免覆盖运行时同步的颜色
+        if (!FriendRankView._backdropColorLocked) {
+            FriendRankView._backdropColor = this.backdropColor ? this.backdropColor.clone() : new Color(0, 0, 0, 160);
+        } else if (this.backdropColor) {
+            // 若已锁定，确保实例字段与已锁定色一致，避免后续 _repaintBackdrop 走实例分支取旧值
+            this.backdropColor = FriendRankView._backdropColor.clone();
+        }
         // 只在首次且未设置尺寸时使用默认值；避免覆盖 show() 传入/计算后的尺寸
         if (ui.contentSize.width === 0 && ui.contentSize.height === 0) {
             ui.setContentSize(this.defaultWidth, this.defaultHeight);
@@ -57,6 +63,9 @@ export class FriendRankView extends Component {
         // 用一个可点击的 UITransform 区域
         const cui = close.addComponent(UITransform);
         cui.setContentSize(64, 64);
+        (cui as any).priority = 1000; // 提高命中优先级，确保优先于遮罩
+        try { (cui as any).priority = 1000; } catch {}
+        try { (cui as any).layer = Layers.Enum.UI_2D; } catch {}
         // 关闭按钮自身用中心锚点，确保 Graphics/Label 以 (0,0) 为中心绘制可见
         cui.setAnchorPoint(0.5, 0.5);
 
@@ -72,23 +81,38 @@ export class FriendRankView extends Component {
         bg.circle(0, 0, 24);
         bg.fill();
 
-        // 用最稳妥的 ASCII 字符 'X'，避免字体缺字形
-        const lab = close.addComponent(Label);
-        lab.fontSize = 36;
-        lab.lineHeight = 40;
-        lab.color = new Color(60, 60, 60, 255);
-        lab.horizontalAlign = 1;   // CENTER
-        lab.verticalAlign = 1;     // CENTER
-        lab.string = 'X';
+        // 画一个矢量 X，放到子节点防止多 Graphics 互相覆盖
+        const crossNode = new Node('CloseVectorX');
+        crossNode.layer = Layers.Enum.UI_2D;
+        const crossUi = crossNode.addComponent(UITransform);
+        crossUi.setContentSize(64, 64);
+        try { (crossUi as any).priority = 1000; } catch {}
+        const cross = crossNode.addComponent(Graphics);
+        cross.clear();
+        cross.lineWidth = 5;
+        cross.lineCap = Graphics.LineCap.ROUND;
+        cross.strokeColor = new Color(220, 40, 40, 255); // 红色 X，区分背景
+        cross.moveTo(-10, -10);
+        cross.lineTo(10, 10);
+        cross.moveTo(10, -10);
+        cross.lineTo(-10, 10);
+        cross.stroke();
+        (cross as any).priority = 10;
+        crossNode.setPosition(0, 0, 0);
+        close.addChild(crossNode);
 
         const handleClose = (e: any) => {
             e?.stopPropagation?.();
-            if (!this._canClose) {
-                console.log('[FriendRankView] close ignored (armed later)');
-                return;
-            }
+            console.log('[FriendRankView] close tapped, canClose=', this._canClose);
+            if (!this._canClose) return;
             FriendRankView.hide();
         };
+        close.on('touchstart', (e: any) => {
+            console.log('[FriendRankView] close touchstart');
+        });
+        close.on('mousedown', (e: any) => {
+            console.log('[FriendRankView] close mousedown');
+        });
         close.on('touchend', handleClose);
         // desktop 兼容：避免 mouseup 与 touchend 在部分环境重复触发
         close.on('mouseup', handleClose);
@@ -119,19 +143,21 @@ export class FriendRankView extends Component {
     }
 
     private _armClose(delaySec: number = 0.15) {
-        this._canClose = false;
+        this._canClose = delaySec <= 0;
 
         // 只取消自己这一项定时，避免误伤其它 schedule 逻辑
         if (this._armCloseCb) {
             try { this.unschedule(this._armCloseCb); } catch {}
         }
 
-        this._closeArmTimer = Date.now();
-        this._armCloseCb = () => {
-            this._canClose = true;
-            console.log('[FriendRankView] close armed', Date.now() - this._closeArmTimer, 'ms');
-        };
-        this.scheduleOnce(this._armCloseCb, delaySec);
+        if (delaySec > 0) {
+            this._closeArmTimer = Date.now();
+            this._armCloseCb = () => {
+                this._canClose = true;
+                console.log('[FriendRankView] close armed', Date.now() - this._closeArmTimer, 'ms');
+            };
+            this.scheduleOnce(this._armCloseCb, delaySec);
+        }
     }
 
     update(dt: number) {
@@ -357,9 +383,15 @@ export class FriendRankView extends Component {
 
     public static setBackdropColor(color: Color | null | undefined) {
         if (!color) return;
+        // 同步静态值与实例字段，避免实例优先级覆盖动态色
         this._backdropColor = color.clone();
+        this._backdropColorLocked = true;
+        const inst = this._instance;
+        if (inst && inst.isValid) {
+            inst.backdropColor = color.clone();
+        }
         if (this._backdropNode && this._backdropNode.isValid) {
-            this._repaintBackdrop(this._backdropNode, null);
+            this._repaintBackdrop(this._backdropNode, this._instance);
         }
     }
 
@@ -408,10 +440,29 @@ export class FriendRankView extends Component {
 
         // 吃掉触摸/鼠标事件，避免传给游戏或其他 UI；并支持“点遮罩空白处关闭”
         const instNow = FriendRankView._instance;
+        const hitClose = (e: any): boolean => {
+            try {
+                const close = (instNow as any)?._closeNode as Node | null;
+                if (!close || !close.isValid) return false;
+                const ui = close.getComponent(UITransform);
+                if (!ui || !ui.isValid) return false;
+                const loc = e?.getUILocation ? e.getUILocation() : (e?.getLocation ? e.getLocation() : null);
+                if (!loc) return false;
+                const local = ui.convertToNodeSpaceAR(new Vec3(loc.x, loc.y, 0));
+                const size = ui.contentSize;
+                return Math.abs(local.x) <= size.width / 2 && Math.abs(local.y) <= size.height / 2;
+            } catch {
+                return false;
+            }
+        };
 
         // Ensure stable handler references for reliable off/on
         if (!FriendRankView._onBackdropSwallow) {
             FriendRankView._onBackdropSwallow = (e: any) => {
+                if (hitClose(e)) {
+                    console.log('[FriendRankView] backdrop: allow pass to close');
+                    return; // 允许点击穿透到关闭按钮
+                }
                 e?.stopPropagationImmediate?.();
                 e?.stopPropagation?.();
             };
@@ -419,6 +470,10 @@ export class FriendRankView extends Component {
 
         if (!FriendRankView._onBackdropClose) {
             FriendRankView._onBackdropClose = (e: any) => {
+                if (hitClose(e)) {
+                    console.log('[FriendRankView] backdrop close handler: click is on close, ignore');
+                    return; // 允许点击穿透到关闭按钮
+                }
                 // 先吞事件，防止点穿
                 e?.stopPropagationImmediate?.();
                 e?.stopPropagation?.();
@@ -483,8 +538,13 @@ export class FriendRankView extends Component {
             // 让遮罩在榜单之下、并把榜单置顶（避免 setSiblingIndex 越界）
             // 最终顺序：... 其它UI ... -> Backdrop -> FriendRankRoot(榜单)
             const end = host.children.length - 1;
-            root.setSiblingIndex(end);
-            mask.setSiblingIndex(Math.max(0, end - 1));
+            const close = (instNow as any)?._closeNode as Node | null;
+            // 预留顶层给关闭按钮：Mask 次之，Root 居中，保证关闭按钮不会被遮罩盖住
+            mask.setSiblingIndex(Math.max(0, end - (close ? 2 : 1)));
+            root.setSiblingIndex(Math.max(0, end - (close ? 1 : 0)));
+            if (close && close.isValid && close.parent === host) {
+                close.setSiblingIndex(host.children.length - 1);
+            }
         }
 
         return mask;

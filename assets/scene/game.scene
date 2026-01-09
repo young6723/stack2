@@ -784,10 +784,10 @@
     "defaultMarginTop": 120,
     "backdropColor": {
       "__type__": "cc.Color",
-      "r": 42,
-      "g": 105,
-      "b": 134,
-      "a": 160
+      "r": 27,
+      "g": 160,
+      "b": 194,
+      "a": 0
     },
     "_id": "39xyPelM9N1qmH+Xx0U5Yh"
   },
