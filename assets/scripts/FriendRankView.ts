@@ -29,6 +29,7 @@ export class FriendRankView extends Component {
     private _closeNode: Node | null = null;
     private _canClose: boolean = false;
     private _closeArmTimer: number = 0;
+    private _lastCloseTapAt: number = 0;
     // scheduleOnce callback reference for arming close (avoid unscheduleAllCallbacks)
     private _armCloseCb: (() => void) | null = null;
 
@@ -69,10 +70,10 @@ export class FriendRankView extends Component {
         // 关闭按钮自身用中心锚点，确保 Graphics/Label 以 (0,0) 为中心绘制可见
         cui.setAnchorPoint(0.5, 0.5);
 
-        // 初始位置：右上角内缩
+        // 初始位置：右上角外侧
         const padding = 16;
         const half = 32; // 64/2，按钮中心偏移
-        close.setPosition((ui.contentSize.width / 2) - padding - half, -padding - half, 0);
+        close.setPosition((ui.contentSize.width / 2) + padding + half, (ui.contentSize.height / 2) - padding - half, 0);
 
         // 更接近微信/系统弹层：浅灰圆底 + 深灰 X
         const bg = close.addComponent(Graphics);
@@ -103,6 +104,11 @@ export class FriendRankView extends Component {
 
         const handleClose = (e: any) => {
             e?.stopPropagation?.();
+            const now = Date.now();
+            // 防止 touchend/mouseup 在部分环境重复触发
+            if (now - this._lastCloseTapAt < 200) return;
+            this._lastCloseTapAt = now;
+
             console.log('[FriendRankView] close tapped, canClose=', this._canClose);
             if (!this._canClose) return;
             FriendRankView.hide();
@@ -298,7 +304,7 @@ export class FriendRankView extends Component {
             if (cui) {
                 cui.setAnchorPoint(0.5, 0.5);
                 const padding = 16;
-                const half = 32; // 64/2
+                const half = 16; // 64/2
                 const panelW = ui ? ui.contentSize.width : clamped.w;
                 const panelHNow = ui ? ui.contentSize.height : clamped.h;
 
@@ -307,7 +313,7 @@ export class FriendRankView extends Component {
                 const ry = root?.position?.y ?? 0;
 
                 const x = rx + (panelW / 2) - padding - half;
-                const y = ry + (panelHNow / 2) - padding - half;
+                const y = ry + (panelHNow / 2) + padding + half;
                 close.setPosition(x, y, 0);
 
                 // 保证 close 永远在最上层
@@ -366,6 +372,39 @@ export class FriendRankView extends Component {
             const ctx = wx.getOpenDataContext?.();
             ctx?.postMessage?.({ type: 'HIDE_FRIEND_RANK' });
         }
+    }
+
+    public static isActive(): boolean {
+        try {
+            const inst = this._instance;
+            if (inst && inst.node && inst.node.isValid) {
+                return !!inst.node.active;
+            }
+        } catch {}
+        try {
+            const scene = director.getScene();
+            const canvas = scene?.getChildByName('Canvas');
+            const root = canvas?.getChildByName('FriendRankRoot') ?? scene?.getChildByName('FriendRankRoot');
+            return !!(root && root.isValid && root.active);
+        } catch {}
+        return false;
+    }
+
+    public static hitTestUI(evt?: any, loc?: Vec2): boolean {
+        if (!evt && !loc) return false;
+        const pos = loc ?? (evt?.getUILocation?.() || evt?.getLocation?.());
+        if (!pos) return false;
+        const hitNode = (n: Node | null): boolean => {
+            if (!n || !n.isValid) return false;
+            const ui = n.getComponent(UITransform);
+            if (!ui || !ui.isValid) return false;
+            const p = ui.convertToNodeSpaceAR(new Vec3(pos.x, pos.y, 0));
+            const s = ui.contentSize;
+            return Math.abs(p.x) <= s.width / 2 && Math.abs(p.y) <= s.height / 2;
+        };
+        return hitNode(this._buttonNode)
+            || hitNode(this._instance?._closeNode ?? null)
+            || hitNode(this._backdropNode);
     }
 
     // 按屏幕高度等比缩放并叠加安全区的上边距算法，避免写死一个像素值
@@ -522,13 +561,7 @@ export class FriendRankView extends Component {
         swallowTypes.forEach(type => mask!.off(type, swallowOnly, this));
         swallowTypes.forEach(type => mask!.on(type, swallowOnly, this));
 
-        // 结束事件也先吞掉，避免冒泡到其它 UI
-        mask!.off(Node.EventType.TOUCH_END, swallowOnly, this);
-        mask!.on(Node.EventType.TOUCH_END, swallowOnly, this);
-        mask!.off(Node.EventType.MOUSE_UP, swallowOnly, this);
-        mask!.on(Node.EventType.MOUSE_UP, swallowOnly, this);
-
-        // 只在 TOUCH_END / MOUSE_UP 绑定关闭
+        // 只在 TOUCH_END / MOUSE_UP 绑定关闭（closeOnBackdrop 内部会先吞事件，再判断是否关闭）
         mask!.off(Node.EventType.TOUCH_END, closeOnBackdrop, this);
         mask!.on(Node.EventType.TOUCH_END, closeOnBackdrop, this);
         mask!.off(Node.EventType.MOUSE_UP, closeOnBackdrop, this);

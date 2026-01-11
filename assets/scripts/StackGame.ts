@@ -156,22 +156,16 @@ export class StackGame extends Component {
         input.once(Input.EventType.MOUSE_DOWN, startBGM, this);
         input.once(Input.EventType.KEY_DOWN, startBGM, this);
     }
-    // 判断事件是否落在好友榜按钮上（避免遮罩吞掉按钮点击）
-    private _isEventOnFriendButton(evt: any): boolean {
-        try {
-            const btn: Node | null = FriendRankView['_buttonNode'] || null;
-            if (!btn || !btn.isValid) return false;
-            const ui = btn.getComponent(UITransform);
-            if (!ui || !ui.isValid) return false;
-            const loc = evt?.getLocation?.();
-            if (!loc) return false;
-            const { x, y } = loc;
-            const pos = ui.convertToNodeSpaceAR(new Vec3(x, y, 0));
-            const size = ui.contentSize;
-            return Math.abs(pos.x) <= size.width / 2 && Math.abs(pos.y) <= size.height / 2;
-        } catch {
-            return false;
-        }
+    // FriendRank 面板是否正在显示（用于屏蔽全局落块触摸）
+    private _isFriendRankActive(): boolean {
+        return FriendRankView.isActive();
+    }
+
+    // 触摸是否落在好友榜相关 UI 上（按钮 / 关闭按钮 / 遮罩）
+    private _isEventOnFriendRankUI(evt: any): boolean {
+        if (!evt) return false;
+        const loc = evt?.getUILocation?.() || evt?.getLocation?.();
+        return FriendRankView.hitTestUI(evt, loc);
     }
     private direction: number = 1;
     @property
@@ -638,14 +632,14 @@ export class StackGame extends Component {
         if (this.startOnTap) {
             n.on(Input.EventType.TOUCH_START, (evt: any) => {
                 // 如果点在好友榜按钮上，则不处理开始
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagationImmediate?.();
                 evt?.stopPropagation?.();
                 (evt as any)?.preventSwallow && ((evt as any).preventSwallow = false); // 兼容处理，无副作用
                 this._handleStartTap();
             }, this);
             n.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagationImmediate?.();
                 evt?.stopPropagation?.();
                 this._handleStartTap();
@@ -1842,23 +1836,23 @@ export class StackGame extends Component {
         // 点击遮罩或按钮重开（受 restartOnTap 控制）
         if (this.restartOnTap) {
             n.on(Input.EventType.TOUCH_END, (evt: any) => {
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagation?.();
                 this._restartGame();
             }, this);
             n.on(Input.EventType.MOUSE_UP, (evt: any) => {
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagation?.();
                 this._restartGame();
             }, this);
         } else {
             btn.on(Input.EventType.TOUCH_END, (evt: any) => {
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagation?.();
                 this._restartGame();
             }, this);
             btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
-                if (this._isEventOnFriendButton(evt)) return;
+                if (this._isEventOnFriendRankUI(evt)) return;
                 evt?.stopPropagation?.();
                 this._restartGame();
             }, this);
@@ -2016,7 +2010,11 @@ export class StackGame extends Component {
         }
     }
 
-    onTouchStart() {
+    onTouchStart(evt?: any) {
+        // 好友榜面板打开时：所有落块触摸都应忽略（否则会出现“点关闭也落块/误触”）
+        if (this._isFriendRankActive() || (evt && this._isEventOnFriendRankUI(evt))) {
+            return;
+        }
         if (this.isWaitingStart) { 
             this._handleStartTap(); 
             return; 
