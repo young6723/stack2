@@ -6,7 +6,7 @@
       "outputName": "wechatgame",
       "mainBundleCompressionType": "merge_dep",
       "platform": "wechatgame",
-      "mainBundleIsRemote": false,
+      "mainBundleIsRemote": true,
       "md5Cache": true,
       "server": "https://yfgame.cloud",
       "scenes": [
@@ -1418,6 +1418,94 @@
         "__version__": "1.0.4"
       },
       "1767924235934": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767933088504": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1767933634102": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768106284860": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768109871949": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768110043515": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768110152631": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768124875350": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768129580944": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768180954642": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768184012997": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1768185371155": {
         "orientation": "portrait",
         "appid": "wxc6d66add66adce28",
         "buildOpenDataContextTemplate": true,

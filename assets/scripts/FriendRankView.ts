@@ -102,26 +102,6 @@ export class FriendRankView extends Component {
         crossNode.setPosition(0, 0, 0);
         close.addChild(crossNode);
 
-        const handleClose = (e: any) => {
-            e?.stopPropagation?.();
-            const now = Date.now();
-            // 防止 touchend/mouseup 在部分环境重复触发
-            if (now - this._lastCloseTapAt < 200) return;
-            this._lastCloseTapAt = now;
-
-            console.log('[FriendRankView] close tapped, canClose=', this._canClose);
-            if (!this._canClose) return;
-            FriendRankView.hide();
-        };
-        close.on('touchstart', (e: any) => {
-            console.log('[FriendRankView] close touchstart');
-        });
-        close.on('mousedown', (e: any) => {
-            console.log('[FriendRankView] close mousedown');
-        });
-        close.on('touchend', handleClose);
-        // desktop 兼容：避免 mouseup 与 touchend 在部分环境重复触发
-        close.on('mouseup', handleClose);
 
         // 注意：SubContextView 可能会覆盖子节点渲染，因此把 close 挂到与面板同级（Canvas）上，确保永远在最上层
         const host = this.node.parent ?? this.node;
@@ -396,6 +376,7 @@ export class FriendRankView extends Component {
         if (!pos) return false;
         const hitNode = (n: Node | null): boolean => {
             if (!n || !n.isValid) return false;
+            if (!n.activeInHierarchy) return false;
             const ui = n.getComponent(UITransform);
             if (!ui || !ui.isValid) return false;
             const p = ui.convertToNodeSpaceAR(new Vec3(pos.x, pos.y, 0));
