@@ -1042,22 +1042,14 @@ export class StackGame extends Component {
 
     private _adjustForBackground(src: Color): Color {
         const { h, s, l } = this._colorToHsl(src);
-        // 互补色：色相 + 180°
-        const h2 = (h + 180) % 360;
-        // 基础：整体轻度降饱和、按明度自适应提亮
-        let s2 = s * 0.45;
-        let l2 = l + 0.10 * (1 - l);
+        // 同色系轻雾化：保留色相，明显降饱和+提明度（雾面玻璃感）
+        const h2 = h;
+        let s2 = s * 0.22;
+        let l2 = l + 0.20 * (1 - l);
 
-        // 分段微调：避免脏绿/闷靛/刺红
-        if (h2 >= 90 && h2 < 150) { // 绿区
-            s2 *= 0.92; // 更干净
-            l2 += 0.03; // 微提亮
-        }
-        if (h2 >= 210 && h2 < 260) { // 靛青区
-            l2 += 0.04; // 防闷
-        }
-        if (h2 >= 340 || h2 < 20) { // 红/品红区
-            s2 = Math.min(s2, 0.60); // 限制饱和避免刺眼
+        // 细微压制暖区饱和，避免泛黄
+        if (h2 >= 330 || h2 < 40) {
+            s2 *= 0.85;
         }
 
         s2 = Math.max(0, Math.min(1, s2));
