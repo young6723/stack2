@@ -1,5 +1,5 @@
 // Import necessary Cocos Creator modules
-import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys } from 'cc';
+import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, Mesh, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys } from 'cc';
 import { FriendRankView } from './FriendRankView';
 declare const wx: any;
 type LeaderboardRowRefs = {
@@ -31,6 +31,9 @@ export class StackGame extends Component {
 
     @property(Material)
     haloMaterial: Material = null; // 可选：光环专用材质（建议使用 Unlit/纯色材质）
+
+    @property(Mesh)
+    haloTubeMesh: Mesh = null; // 可选：空心光环网格（矩形管）
 
     @property(Prefab)
     perfectEffectPrefab: Prefab = null;
@@ -1039,25 +1042,27 @@ export class StackGame extends Component {
 
     private _adjustForBackground(src: Color): Color {
         const { h, s, l } = this._colorToHsl(src);
+        // 互补色：色相 + 180°
+        const h2 = (h + 180) % 360;
         // 基础：整体轻度降饱和、按明度自适应提亮
-        let s2 = s * 0.88;
-        let l2 = l + 0.12 * (1 - l);
+        let s2 = s * 0.45;
+        let l2 = l + 0.10 * (1 - l);
 
         // 分段微调：避免脏绿/闷靛/刺红
-        if (h >= 90 && h < 150) { // 绿区
+        if (h2 >= 90 && h2 < 150) { // 绿区
             s2 *= 0.92; // 更干净
             l2 += 0.03; // 微提亮
         }
-        if (h >= 210 && h < 260) { // 靛青区
+        if (h2 >= 210 && h2 < 260) { // 靛青区
             l2 += 0.04; // 防闷
         }
-        if (h >= 340 || h < 20) { // 红/品红区
+        if (h2 >= 340 || h2 < 20) { // 红/品红区
             s2 = Math.min(s2, 0.60); // 限制饱和避免刺眼
         }
 
         s2 = Math.max(0, Math.min(1, s2));
         l2 = Math.max(0, Math.min(1, l2));
-        return this._hslToColor(h, s2, l2);
+        return this._hslToColor(h2, s2, l2);
     }
 
     // 平滑过渡背景颜色
@@ -2392,10 +2397,10 @@ export class StackGame extends Component {
         // 放在顶面略上方，避免与顶面 Z-fighting
         const ringY = pos.y + sy * 0.5 + 0.01;
 
-        // 光环厚度（条块短边），随尺寸/连击微调
+        // 光环厚度（整体盒子的高度），随尺寸/连击微调
         const k = Math.min(Math.max(combo, 0), 6);
-        const baseT = Math.min(sx, sz) * 0.08;
-        const thickness = Math.max(0.04, Math.min(0.22, baseT + k * 0.005));
+        const baseT = Math.min(sx, sz) * 0.10;
+        const thickness = Math.max(0.05, Math.min(0.18, baseT + k * 0.006));
 
         // 初始内径长度（贴边加少量 margin）
         const margin = Math.max(0.02, Math.min(0.06, Math.min(sx, sz) * 0.015));
@@ -2422,20 +2427,75 @@ export class StackGame extends Component {
         }
         const finalColor = this._computeHaloColor(isBurst, refColor ?? undefined);
 
-        // 工具：创建一条条块段（沿X或沿Z）
+        // 动画：整体外扩（len↑、thickness↓），强档位移更远
+        // 阈值达成（第5次及以后）显著增强外扩距离与长度增长
+        const strong = !!isBurst;
+        const dur = strong ? 0.42 : 0.35; // 强外扩：时间略长，张力更足
+        const lenGrow = (strong ? 1.60 : 1.10) + k * (strong ? 0.03 : 0.01); // 强：外扩更远
+        const thickShrink = strong ? 0.50 : 0.65;                             // 强：更薄更锐利
+        const posGrowFactor = strong ? 1.60 : 0.60;                           // 强：外移更明显
+
+        // 空心光环：用四条薄盒组成框
+        const height = thickness;
+        const wall = Math.max(0.03, Math.min(0.12, thickness * 0.6));
+        const outerX = innerX + wall * 2;
+        const outerZ = innerZ + wall * 2;
+
+        if (this.haloTubeMesh) {
+            const tube = new Node('HaloTube');
+            tube.setPosition(0, 0, 0);
+            tube.setScale(new Vec3(outerX, height, outerZ));
+            ring.addChild(tube);
+
+            const tubeMr = tube.addComponent(MeshRenderer);
+            tubeMr.mesh = this.haloTubeMesh;
+            if (this.haloMaterial) {
+                tubeMr.setMaterial(this.haloMaterial, 0);
+                this._matColorKey = null;
+            }
+            const tubeMat = tubeMr.getMaterialInstance(0);
+            if (tubeMat) this._setMatColor(tubeMat, finalColor);
+
+            const targetScale = new Vec3(outerX * lenGrow, height * thickShrink, outerZ * lenGrow);
+            const rise = (strong ? 0.06 : 0.03) * posGrowFactor;
+            const targetRingPos = new Vec3(pos.x, ringY + rise, pos.z);
+            tween(tube).to(dur, { scale: targetScale }, { easing: 'quadOut' }).start();
+            tween(ring).to(dur, { position: targetRingPos }, { easing: 'quadOut' }).start();
+
+            if (tubeMat) {
+                const start = this._getMatColor(tubeMat) ?? finalColor;
+                const anim = new Color(start);
+                tween(anim)
+                    .to(dur * 0.9, { a: 0 }, { onUpdate: () => this._setMatColor(tubeMat, anim) })
+                    .start();
+            }
+
+            this.scheduleOnce(() => {
+                if (!this.isValid) return;
+                if (tube && tube.isValid) {
+                    tube.removeFromParent();
+                    tube.destroy();
+                }
+                if (ring && ring.isValid) {
+                    ring.removeFromParent();
+                    ring.destroy();
+                }
+            }, dur + 0.02);
+            return;
+        }
+        const halfZ = innerZ / 2 + wall / 2;
+        const halfX = innerX / 2 + wall / 2;
+
         const makeStrip = (name: string, alongX: boolean, len: number, thick: number, localPos: Vec3) => {
             const n = this._acquireStrip();
             n.name = name;
             n.setPosition(localPos);
-            // 极薄Y，外观看成一条发光边
-            const scale = alongX ? new Vec3(len, 0.02, thick) : new Vec3(thick, 0.02, len);
+            const scale = alongX ? new Vec3(len, height, thick) : new Vec3(thick, height, len);
             n.setScale(scale);
             ring.addChild(n);
 
-            // 设置颜色为提亮版，并收集材质实例
             const mr = n.getComponent(MeshRenderer);
             if (mr) {
-                // 若配置了光环专用材质，则不再使用 blockPrefab 的材质
                 if (this.haloMaterial) {
                     mr.setMaterial(this.haloMaterial, 0);
                     this._matColorKey = null;
@@ -2452,42 +2512,31 @@ export class StackGame extends Component {
             return n;
         };
 
-        // 四条：Top/Bottom 沿X；Left/Right 沿Z
-        const halfZ = innerZ / 2 + thickness / 2;
-        const halfX = innerX / 2 + thickness / 2;
+        const top = makeStrip('HaloTop', true, outerX, wall, new Vec3(0, 0, halfZ));
+        const bottom = makeStrip('HaloBottom', true, outerX, wall, new Vec3(0, 0, -halfZ));
+        const left = makeStrip('HaloLeft', false, outerZ, wall, new Vec3(-halfX, 0, 0));
+        const right = makeStrip('HaloRight', false, outerZ, wall, new Vec3(halfX, 0, 0));
 
-        const top    = makeStrip('HaloTop',    true,  innerX, thickness, new Vec3(0, 0,  halfZ));
-        const bottom = makeStrip('HaloBottom', true,  innerX, thickness, new Vec3(0, 0, -halfZ));
-        const left   = makeStrip('HaloLeft',   false, innerZ, thickness, new Vec3(-halfX, 0, 0));
-        const right  = makeStrip('HaloRight',  false, innerZ, thickness, new Vec3( halfX, 0, 0));
-
-        // 动画：整体外扩（len↑、thickness↓），强档位移更远
-        // 阈值达成（第5次及以后）显著增强外扩距离与长度增长
-        const strong = !!isBurst;
-        const dur = strong ? 0.42 : 0.35; // 强外扩：时间略长，张力更足
-        const lenGrow = (strong ? 1.60 : 1.10) + k * (strong ? 0.03 : 0.01); // 强：外扩更远
-        const thickShrink = strong ? 0.50 : 0.65;                             // 强：更薄更锐利
-        const posGrowFactor = strong ? 1.60 : 0.60;                           // 强：外移更明显
-
-        // 目标尺寸
-        const targetTopScale    = new Vec3(innerX * lenGrow, 0.02, thickness * thickShrink);
-        const targetBottomScale = new Vec3(innerX * lenGrow, 0.02, thickness * thickShrink);
-        const targetLeftScale   = new Vec3(thickness * thickShrink, 0.02, innerZ * lenGrow);
-        const targetRightScale  = new Vec3(thickness * thickShrink, 0.02, innerZ * lenGrow);
-
-        // 条块外扩时，中心位置随之外移（强档位移更远）
-        const targetTopPos    = new Vec3(0, 0,  halfZ * (1 + (lenGrow - 1) * posGrowFactor));
+        // 目标尺寸与上浮（整体外扩 + 稍上抬）
+        const targetTopScale = new Vec3(outerX * lenGrow, height * thickShrink, wall * thickShrink);
+        const targetBottomScale = new Vec3(outerX * lenGrow, height * thickShrink, wall * thickShrink);
+        const targetLeftScale = new Vec3(wall * thickShrink, height * thickShrink, outerZ * lenGrow);
+        const targetRightScale = new Vec3(wall * thickShrink, height * thickShrink, outerZ * lenGrow);
+        const targetTopPos = new Vec3(0, 0, halfZ * (1 + (lenGrow - 1) * posGrowFactor));
         const targetBottomPos = new Vec3(0, 0, -halfZ * (1 + (lenGrow - 1) * posGrowFactor));
-        const targetLeftPos   = new Vec3(-halfX * (1 + (lenGrow - 1) * posGrowFactor), 0, 0);
-        const targetRightPos  = new Vec3( halfX * (1 + (lenGrow - 1) * posGrowFactor), 0, 0);
+        const targetLeftPos = new Vec3(-halfX * (1 + (lenGrow - 1) * posGrowFactor), 0, 0);
+        const targetRightPos = new Vec3(halfX * (1 + (lenGrow - 1) * posGrowFactor), 0, 0);
+        const rise = (strong ? 0.06 : 0.03) * posGrowFactor;
+        const targetRingPos = new Vec3(pos.x, ringY + rise, pos.z);
 
-        tween(top).to(dur,    { scale: targetTopScale,    position: targetTopPos    }, { easing: 'quadOut' }).start();
+        tween(top).to(dur, { scale: targetTopScale, position: targetTopPos }, { easing: 'quadOut' }).start();
         tween(bottom).to(dur, { scale: targetBottomScale, position: targetBottomPos }, { easing: 'quadOut' }).start();
-        tween(left).to(dur,   { scale: targetLeftScale,   position: targetLeftPos   }, { easing: 'quadOut' }).start();
-        tween(right).to(dur,  { scale: targetRightScale,  position: targetRightPos  }, { easing: 'quadOut' }).start();
+        tween(left).to(dur, { scale: targetLeftScale, position: targetLeftPos }, { easing: 'quadOut' }).start();
+        tween(right).to(dur, { scale: targetRightScale, position: targetRightPos }, { easing: 'quadOut' }).start();
+        tween(ring).to(dur, { position: targetRingPos }, { easing: 'quadOut' }).start();
 
-        // 强外扩：在运动同时做颜色淡出，避免尾部停留太久
-        if (strong && _haloMats.length > 0) {
+        // 颜色淡出（所有档位都淡，强档更明显）
+        if (_haloMats.length > 0) {
             for (const m of _haloMats) {
                 if (!m) continue;
                 const start = this._getMatColor(m) ?? finalColor;

@@ -15,7 +15,7 @@ export class FriendRankView extends Component {
     private static _backdropColorLocked: boolean = false; // 由运行时动态颜色锁定，避免 onLoad 覆盖
 
     private static readonly _btnMarginXBase = 36;
-    private static readonly _btnMarginYBase = 120; // 稍微下移，使其与右侧分数更齐平
+    private static readonly _btnMarginYBase = 160; // 稍微下移，使其与右侧分数更齐平
     // 默认用不透明白色：确保完全遮挡下层 UI（需要半透明可在 Inspector 里改 backdropColor）
     private static _backdropColor: Color = new Color(255, 255, 255, 255);
     @property
