@@ -952,6 +952,40 @@ export class StackGame extends Component {
         return null;
     }
 
+    private _readMatColorProp(mat: Material, prop: string): Color | null {
+        try {
+            const v: any = (mat as any).getProperty?.(prop);
+            if (v === undefined || v === null) return null;
+            if (v instanceof Color) return v.clone();
+            if (Array.isArray(v) && v.length >= 3) {
+                const [r, g, b, a = 1] = v;
+                return new Color(r * 255, g * 255, b * 255, a * 255);
+            }
+            if (typeof v === 'object' && 'x' in v && 'y' in v && 'z' in v) {
+                const a = 'w' in v ? (v as any).w : 1;
+                return new Color((v as any).x * 255, (v as any).y * 255, (v as any).z * 255, a * 255);
+            }
+        } catch {}
+        return null;
+    }
+
+    private _setMatColorProp(mat: Material, prop: string, color: Color): boolean {
+        try {
+            const cur = (mat as any).getProperty?.(prop);
+            if (cur === undefined) return false;
+            try { (mat as any).setProperty?.(prop, color); return true; } catch {}
+            const toVec4 = [color.r / 255, color.g / 255, color.b / 255, color.a / 255];
+            try { (mat as any).setProperty?.(prop, toVec4 as any); return true; } catch {}
+        } catch {}
+        return false;
+    }
+
+    private _tweakLightness(src: Color, delta: number): Color {
+        const { h, s, l } = this._colorToHsl(src);
+        const l2 = Math.max(0, Math.min(1, l + delta));
+        return this._hslToColor(h, s, l2);
+    }
+
     private _setMatColor(mat: Material, color: Color): void {
         const baseKeys = ['albedo', 'mainColor', 'baseColor', 'u_color', 'color', 'albedoColor', 'baseColorFactor', 'emissive', 'emissiveColor'];
         const keys = this._matColorKey ? [this._matColorKey, ...baseKeys] : baseKeys;
@@ -976,17 +1010,17 @@ export class StackGame extends Component {
         const cam = this.cameraNode;
         if (!bg || !cam) return;
 
-        // 让背景板跟随相机，始终在相机前方
+        //让背景板跟随相机，始终在相机前方
         if (bg.parent !== cam) {
             bg.removeFromParent();
             cam.addChild(bg);
         }
         // 注意：相机默认朝向 -Z，因此前方应为本地 -Z
-        bg.setPosition(0, 0, -130);
+        bg.setPosition(0, 0, -80);
         // 与相机同向，保证正面朝向镜头
-        bg.setRotation(cam.rotation);
-        // 放大到覆盖画面
-        bg.setScale(9000, 1, 9000);
+        //bg.setRotation(cam.rotation);
+         // 放大到覆盖画面
+        bg.setScale(8, 1, 8);
 
         // 优先绘制（或最后绘制均可），这里取较小的优先级，避免遮挡其他物体
         const mr = bg.getComponent(MeshRenderer);
@@ -1004,7 +1038,10 @@ export class StackGame extends Component {
         const mat = mr.getMaterialInstance(0);
         if (!mat) return;
         const adj = this._adjustForBackground(color.clone());
-        this._setMatColor(mat, adj);
+        const top = this._tweakLightness(adj, 0.06);
+        const bottom = this._tweakLightness(adj, -0.06);
+        const hasGradient = this._setMatColorProp(mat, 'topColor', top) && this._setMatColorProp(mat, 'bottomColor', bottom);
+        if (!hasGradient) this._setMatColor(mat, adj);
     }
 
     // —— 背景色微调工具：把方块色转为更通透的背景色（提亮≈12%，降饱和≈12%） ——
@@ -1066,8 +1103,28 @@ export class StackGame extends Component {
         const mat = mr.getMaterialInstance(0);
         if (!mat) return;
 
-        const current = this._getMatColor(mat) ?? new Color(255, 255, 255, 255);
         const targetAdj = this._adjustForBackground(target.clone());
+        const targetTop = this._tweakLightness(targetAdj, 0.06);
+        const targetBottom = this._tweakLightness(targetAdj, -0.06);
+        const curTop = this._readMatColorProp(mat, 'topColor');
+        const curBottom = this._readMatColorProp(mat, 'bottomColor');
+        if (curTop && curBottom) {
+            const animTop = new Color(curTop);
+            const animBottom = new Color(curBottom);
+            tween(animTop)
+                .to(duration, { r: targetTop.r, g: targetTop.g, b: targetTop.b, a: targetTop.a }, {
+                    onUpdate: () => this._setMatColorProp(mat, 'topColor', animTop)
+                })
+                .start();
+            tween(animBottom)
+                .to(duration, { r: targetBottom.r, g: targetBottom.g, b: targetBottom.b, a: targetBottom.a }, {
+                    onUpdate: () => this._setMatColorProp(mat, 'bottomColor', animBottom)
+                })
+                .start();
+            return;
+        }
+
+        const current = this._getMatColor(mat) ?? new Color(255, 255, 255, 255);
         const anim = new Color(current);
         tween(anim)
             .to(duration, { r: targetAdj.r, g: targetAdj.g, b: targetAdj.b, a: targetAdj.a }, {
@@ -1718,7 +1775,7 @@ export class StackGame extends Component {
             const screenRatio = screen?.windowSize
                 ? screen.windowSize.height / screen.windowSize.width
                 : 2.0;
-            const idealScreenFactor = 1.0 + screenRatio * 0.5; // 越大越远，基于竖屏比例动态调整
+            const idealScreenFactor = 1.0 + screenRatio * 0.10; // 越大越远，基于竖屏比例动态调整
             const scaleRatio = idealScreenFactor;
             const camComp = this.cameraNode.getComponent(Camera);
             const isOrtho = !!camComp && camComp.projection === Camera.ProjectionType.ORTHO;
@@ -1743,21 +1800,35 @@ export class StackGame extends Component {
                 if (dir.length() < 0.001) dir.set(1, 1, 1);
                 dir.normalize();
                 const baseDist = basePos.length();
-                const targetDist = baseDist + towerHeight * scaleRatio;
+                const baseY = this.baseBlock ? this.baseBlock.position.y : 0;
+                const topY = baseY + towerHeight;
+                // 视线中心偏向塔身下部，优先保证顶部不裁切
+                const focusY = baseY + towerHeight * 1;
+                let targetDist = baseDist + towerHeight * scaleRatio;
+                if (camComp) {
+                    const fovRad = camComp.fov * Math.PI / 180;
+                    const halfView = Math.max(0.001, topY - focusY);
+                    const requiredDist = halfView / Math.tan(fovRad * 0.5);
+                    targetDist = Math.max(targetDist, requiredDist) * 1.02;
+                }
                 const farOffset = dir.multiplyScalar(targetDist);
-                const focusY = this.baseBlock ? (this.baseBlock.position.y + this.baseBlock.scale.y * 0.5) : 0;
                 const farCameraPos = new Vec3(farOffset.x, farOffset.y + focusY, farOffset.z);
-                const targetEuler = this._cameraBaseEuler?.clone() ?? this.cameraNode.eulerAngles.clone();
+                const baseXZ = this.baseBlock ? this.baseBlock.position : new Vec3(0, 0, 0);
+                const lookAtPos = new Vec3(baseXZ.x, focusY, baseXZ.z);
 
                 // 可选增强：防止摄像机动画冲突（如未来出问题可加）
                 // tween.stopAllByTarget(this.cameraNode);
 
                 tween(this.cameraNode)
                     .stop()
-                    .to(1.2, {
-                        position: farCameraPos,
-                        eulerAngles: targetEuler // 保持你在场景里设定的视角角度
-                    }, { easing: 'cubicOut' })
+                    .to(1.2, { position: farCameraPos }, {
+                        easing: 'cubicOut',
+                        onUpdate: () => {
+                            if (this.cameraNode && this.cameraNode.isValid) {
+                                this.cameraNode.lookAt(lookAtPos);
+                            }
+                        }
+                    })
                     .start();
             }
         }, 1);

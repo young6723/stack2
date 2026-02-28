@@ -1,0 +1,39 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: vs
+      frag: fs
+      rasterizerState:
+        cullMode: none
+      properties:
+        topColor: { value: [1, 1, 1, 1] }
+        bottomColor: { value: [1, 1, 1, 1] }
+}%
+
+CCProgram vs %{
+  precision highp float;
+  #include <cc-global>
+  #include <cc-local>
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  out float v_t;
+  void main () {
+    vec4 pos = cc_matWorld * vec4(a_position, 1.0);
+    gl_Position = cc_matViewProj * pos;
+    v_t = a_texCoord.y;
+  }
+}%
+
+CCProgram fs %{
+  precision highp float;
+  in float v_t;
+  uniform UBOFrag {
+    vec4 topColor;
+    vec4 bottomColor;
+  };
+  layout(location = 0) out vec4 o_color;
+  void main () {
+    float t = clamp(v_t, 0.0, 1.0);
+    o_color = mix(bottomColor, topColor, t);
+  }
+}%
