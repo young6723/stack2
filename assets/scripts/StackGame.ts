@@ -1,6 +1,8 @@
 // Import necessary Cocos Creator modules
-import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, Mesh, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys } from 'cc';
+import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, Mesh, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys, Graphics, BlockInputEvents } from 'cc';
 import { FriendRankView } from './FriendRankView';
+import { DailyTaskConfig, TaskManager } from './TaskManager';
+import * as dailyTaskConfigs from '../config/daily_tasks.json';
 declare const wx: any;
 type LeaderboardRowRefs = {
     rankLabel: Label;
@@ -19,9 +21,21 @@ type LeaderboardView = {
     root: Node;
     rows: LeaderboardRowRefs[];
 };
+type DailyTaskRowRefs = {
+    taskId: string;
+    progressLabel: Label;
+    claimLabel: Label;
+    statusLabel: Label;
+};
 
 
 const LB_KEY = 'stack_leaderboard_v1';
+const DAILY_TASK_POINTS_KEY = 'daily_task_points_v1';
+function _resolveDailyTaskConfigs(raw: unknown): DailyTaskConfig[] {
+    const maybeDefault = (raw as { default?: unknown })?.default;
+    const list = Array.isArray(maybeDefault) ? maybeDefault : raw;
+    return Array.isArray(list) ? (list as DailyTaskConfig[]) : [];
+}
 const { ccclass, property } = _decorator;
 
 @ccclass('StackGame')
@@ -110,6 +124,15 @@ export class StackGame extends Component {
     private mainScoreLabelNode: Node = null;    // 主分数 Label（总分）
     private subLayerLabelNode: Node = null;     // 副显示 Label（层数）
     private comboBadgeNode: Node = null;        // 连击徽章（UI 动态创建）
+    private taskEntryButtonNode: Node = null;   // 右侧任务入口图标
+    private taskPointsNode: Node = null;        // 右上角任务积分展示
+    private taskPointsLabel: Label = null;
+    private taskPointsDiamondIconLabel: Label = null;
+    private taskPanelNode: Node = null;         // 任务面板
+    private taskPanelPointsLabel: Label = null;
+    private taskRows: DailyTaskRowRefs[] = [];
+    private taskPoints: number = 0;
+    private _lastTaskEntryClickAt: number = 0;
     // —— Start Overlay —— 
     @property
     startOnTap: boolean = true; // 允许点击屏幕/按键开始
@@ -170,6 +193,34 @@ export class StackGame extends Component {
         const loc = evt?.getUILocation?.() || evt?.getLocation?.();
         return FriendRankView.hitTestUI(evt, loc);
     }
+
+    private _isPointInUINode(node: Node | null, loc: any): boolean {
+        if (!node || !node.isValid || !loc) return false;
+        const ui = node.getComponent(UITransform);
+        if (!ui) return false;
+        const local = ui.convertToNodeSpaceAR(new Vec3(loc.x, loc.y, 0));
+        const size = ui.contentSize;
+        const anchor = ui.anchorPoint;
+        const left = -size.width * anchor.x;
+        const right = left + size.width;
+        const bottom = -size.height * anchor.y;
+        const top = bottom + size.height;
+        return (
+            local.x >= left &&
+            local.x <= right &&
+            local.y >= bottom &&
+            local.y <= top
+        );
+    }
+
+    private _isEventOnTaskUI(evt: any): boolean {
+        if (!evt) return false;
+        const loc = evt?.getUILocation?.() || evt?.getLocation?.();
+        if (!loc) return false;
+        if (this._isPointInUINode(this.taskEntryButtonNode, loc)) return true;
+        if (this._isPointInUINode(this.taskPanelNode, loc)) return true;
+        return false;
+    }
     private direction: number = 1;
     @property
     moveSpeed: number = 3.4;        // 起步略快，减少“发涩”感
@@ -214,6 +265,7 @@ export class StackGame extends Component {
     private isGameOver: boolean = false;
     private score: number = 0;
     private points: number = 0;     // 总分（主显示）
+    private readonly taskManager = TaskManager.getInstance();
     private _matColorKey: string | null = null; // 记录当前材质颜色属性键（兼容 albedo/mainColor/baseColor/u_color/color）
     private moveAxis: 'x' | 'z' = 'z'; // 初始为 z 轴
 
@@ -378,6 +430,407 @@ export class StackGame extends Component {
         if (opt.shadowBlur !== undefined) { L.shadowBlur = opt.shadowBlur; }
     }
 
+    private _loadTaskPoints(): void {
+        try {
+            const raw = sys.localStorage.getItem(DAILY_TASK_POINTS_KEY);
+            const n = raw ? Number(raw) : 0;
+            this.taskPoints = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+        } catch {
+            this.taskPoints = 0;
+        }
+    }
+
+    private _saveTaskPoints(): void {
+        try {
+            sys.localStorage.setItem(DAILY_TASK_POINTS_KEY, String(this.taskPoints));
+        } catch {}
+    }
+
+    private _addTaskPoints(delta: number): void {
+        const v = Math.max(0, Math.floor(delta));
+        if (v <= 0) return;
+        this.taskPoints += v;
+        this._saveTaskPoints();
+        this._refreshTaskHUD();
+    }
+
+    private _reportTask(type: 'login' | 'play_count' | 'reach_layers' | 'perfect_stack' | 'reach_score', value: number = 1, mode: 'inc' | 'set-max' = 'inc'): void {
+        this.taskManager.report(type, value, mode);
+        this._refreshTaskPanel();
+    }
+
+    private _drawRoundRect(node: Node, width: number, height: number, color: Color, radius: number = 14): void {
+        let gfx = node.getComponent(Graphics);
+        if (!gfx) gfx = node.addComponent(Graphics);
+        gfx.clear();
+        gfx.fillColor = color;
+        gfx.roundRect(-width * 0.5, -height * 0.5, width, height, radius);
+        gfx.fill();
+    }
+
+    private _drawTaskEntryTargetIcon(node: Node): void {
+        let gfx = node.getComponent(Graphics);
+        if (!gfx) gfx = node.addComponent(Graphics);
+        gfx.clear();
+        gfx.lineWidth = 5;
+        gfx.strokeColor = new Color(255, 255, 255, 245);
+
+        gfx.circle(0, 0, 34);
+        gfx.stroke();
+
+        gfx.circle(0, 0, 20);
+        gfx.stroke();
+
+        gfx.moveTo(18, 18);
+        gfx.lineTo(36, 36);
+        gfx.stroke();
+
+        gfx.moveTo(28, 36);
+        gfx.lineTo(36, 36);
+        gfx.lineTo(36, 28);
+        gfx.stroke();
+
+        gfx.moveTo(0, -4);
+        gfx.lineTo(0, 4);
+        gfx.moveTo(-4, 0);
+        gfx.lineTo(4, 0);
+        gfx.stroke();
+    }
+
+    private _buildTaskProgressBar(progress: number, target: number, slots: number = 12): string {
+        const safeTarget = Math.max(1, target);
+        const ratio = Math.max(0, Math.min(1, progress / safeTarget));
+        const filled = Math.round(ratio * slots);
+        return `[${'■'.repeat(filled)}${'·'.repeat(Math.max(0, slots - filled))}] ${progress}/${safeTarget}`;
+    }
+
+    private _ensureTaskHUD(): void {
+        if (!this._isAlive(this.uiCanvas)) return;
+        if (!this.taskPointsNode || !this.taskPointsNode.isValid) {
+            const n = new Node('TaskPoints');
+            n.layer = Layers.Enum.UI_2D;
+            n.addComponent(UITransform).setContentSize(180, 120);
+
+            const diamond = new Node('DiamondPoints');
+            diamond.layer = Layers.Enum.UI_2D;
+            diamond.addComponent(UITransform).setContentSize(180, 40);
+            const dValueNode = new Node('DiamondValue');
+            dValueNode.layer = Layers.Enum.UI_2D;
+            dValueNode.addComponent(UITransform).setContentSize(130, 40);
+            dValueNode.setPosition(-40, 0, 0);
+            const dValueLab = dValueNode.addComponent(Label);
+            dValueLab.string = '0';
+            dValueLab.fontSize = 36;
+            dValueLab.lineHeight = 40;
+            dValueLab.color = new Color(255, 255, 255, 255);
+            (dValueLab as any).horizontalAlign = 2; // right
+            diamond.addChild(dValueNode);
+
+            const dIconNode = new Node('DiamondIcon');
+            dIconNode.layer = Layers.Enum.UI_2D;
+            dIconNode.addComponent(UITransform).setContentSize(40, 40);
+            dIconNode.setPosition(17, 0, 0);
+            const dIconLab = dIconNode.addComponent(Label);
+            dIconLab.string = '◆';
+            dIconLab.fontSize = 42;
+            dIconLab.lineHeight = 42;
+            dIconLab.color = new Color(255, 255, 255, 255);
+            (dIconLab as any).horizontalAlign = 1; // center
+            diamond.addChild(dIconNode);
+            diamond.setPosition(0, -350, 0);
+            n.addChild(diamond);
+            this.taskPointsLabel = dValueLab;
+            this.taskPointsDiamondIconLabel = dIconLab;
+
+            this.uiCanvas.addChild(n);
+            this.taskPointsNode = n;
+            this._rememberBaseScale(this.taskPointsNode);
+        }
+
+        if (!this.taskEntryButtonNode || !this.taskEntryButtonNode.isValid) {
+            const btn = new Node('TaskEntry');
+            btn.layer = Layers.Enum.UI_2D;
+            const btnUI = btn.addComponent(UITransform);
+            btnUI.setContentSize(120, 120);
+            if (!btn.getComponent(BlockInputEvents)) {
+                btn.addComponent(BlockInputEvents);
+            }
+            const iconNode = new Node('TaskEntryIcon');
+            iconNode.layer = Layers.Enum.UI_2D;
+            iconNode.addComponent(UITransform).setContentSize(88, 88);
+            this._drawTaskEntryTargetIcon(iconNode);
+            btn.addChild(iconNode);
+            btn.on(Input.EventType.TOUCH_START, (evt: any) => {
+                evt?.stopPropagation?.();
+            }, this);
+            btn.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
+                evt?.stopPropagation?.();
+            }, this);
+            btn.on(Input.EventType.TOUCH_END, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleTaskEntryClick();
+            }, this);
+            btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleTaskEntryClick();
+            }, this);
+            this.uiCanvas.addChild(btn);
+            this.taskEntryButtonNode = btn;
+            this._rememberBaseScale(this.taskEntryButtonNode);
+        }
+
+        this._refreshTaskHUD();
+    }
+
+    private _refreshTaskHUD(): void {
+        if (this.taskPointsLabel && this.taskPointsLabel.isValid) {
+            this.taskPointsLabel.string = `${this.taskPoints}`;
+        }
+        if (this.taskPanelPointsLabel && this.taskPanelPointsLabel.isValid) {
+            this.taskPanelPointsLabel.string = `积分 ${this.taskPoints}`;
+        }
+    }
+
+    private _bringTaskHUDToFront(): void {
+        if (this.taskPointsNode && this.taskPointsNode.isValid) {
+            this.taskPointsNode.setSiblingIndex(Number.MAX_SAFE_INTEGER);
+        }
+        if (this.taskEntryButtonNode && this.taskEntryButtonNode.isValid) {
+            this.taskEntryButtonNode.setSiblingIndex(Number.MAX_SAFE_INTEGER);
+        }
+    }
+
+    private _handleTaskEntryClick(): void {
+        const now = Date.now();
+        if (now - this._lastTaskEntryClickAt < 180) {
+            return;
+        }
+        this._lastTaskEntryClickAt = now;
+        try {
+            this._toggleTaskPanel();
+        } catch (err) {
+            console.warn('[Task] toggle panel failed', err);
+        }
+    }
+
+    private _toggleTaskPanel(): void {
+        if (this.taskPanelNode && this.taskPanelNode.isValid) {
+            this._hideTaskPanel();
+            return;
+        }
+        this._showTaskPanel();
+    }
+
+    private _showTaskPanel(): void {
+        if (!this._isAlive(this.uiCanvas)) return;
+        if (this.taskPanelNode && this.taskPanelNode.isValid) return;
+
+        let w = 750, h = 1334;
+        try {
+            const vs = view.getVisibleSize();
+            if (vs && vs.width > 0 && vs.height > 0) {
+                w = vs.width;
+                h = vs.height;
+            }
+        } catch {}
+
+        const root = new Node('TaskPanel');
+        root.layer = Layers.Enum.UI_2D;
+        root.addComponent(UITransform).setContentSize(w, h);
+        const mask = root.addComponent(UIOpacity);
+        mask.opacity = 0;
+        root.setPosition(0, 0, 0);
+        root.on(Input.EventType.TOUCH_START, (evt: any) => evt?.stopPropagation?.(), this);
+        root.on(Input.EventType.TOUCH_END, (evt: any) => evt?.stopPropagation?.(), this);
+
+        const board = new Node('Board');
+        board.layer = Layers.Enum.UI_2D;
+        const bw = Math.min(680, w * 0.88);
+        const bh = Math.min(980, h * 0.78);
+        board.addComponent(UITransform).setContentSize(bw, bh);
+        board.setPosition(0, -20, 0);
+        this._drawRoundRect(board, bw, bh, new Color(26, 24, 84, 220), 18);
+        root.addChild(board);
+
+        const title = new Node('Title');
+        title.layer = Layers.Enum.UI_2D;
+        title.addComponent(UITransform).setContentSize(200, 56);
+        const tLab = title.addComponent(Label);
+        tLab.string = '任务';
+        tLab.fontSize = 48;
+        tLab.lineHeight = 52;
+        tLab.color = new Color(255, 255, 255, 255);
+        title.setPosition(0, bh * 0.42, 0);
+        board.addChild(title);
+
+        const points = new Node('Points');
+        points.layer = Layers.Enum.UI_2D;
+        points.addComponent(UITransform).setContentSize(220, 44);
+        const pLab = points.addComponent(Label);
+        pLab.string = '';
+        pLab.fontSize = 30;
+        pLab.lineHeight = 34;
+        pLab.color = new Color(255, 255, 255, 230);
+        points.setPosition(bw * 0.26, bh * 0.42, 0);
+        board.addChild(points);
+        this.taskPanelPointsLabel = pLab;
+
+        const close = new Node('Close');
+        close.layer = Layers.Enum.UI_2D;
+        close.addComponent(UITransform).setContentSize(72, 52);
+        const cLab = close.addComponent(Label);
+        cLab.string = '←';
+        cLab.fontSize = 56;
+        cLab.lineHeight = 56;
+        cLab.color = new Color(255, 255, 255, 255);
+        close.setPosition(-bw * 0.42, bh * 0.42, 0);
+        close.on(Input.EventType.TOUCH_END, (evt: any) => {
+            evt?.stopPropagation?.();
+            this._hideTaskPanel();
+        }, this);
+        close.on(Input.EventType.MOUSE_UP, (evt: any) => {
+            evt?.stopPropagation?.();
+            this._hideTaskPanel();
+        }, this);
+        board.addChild(close);
+
+        this.taskRows = [];
+        const tasks = this.taskManager.getTasks();
+        const top = bh * 0.28;
+        const stepY = 150;
+        const rowW = bw * 0.9;
+        const rowH = 120;
+        for (let i = 0; i < tasks.length; i += 1) {
+            const task = tasks[i];
+            const row = new Node(`TaskRow_${task.id}`);
+            row.layer = Layers.Enum.UI_2D;
+            row.addComponent(UITransform).setContentSize(rowW, rowH);
+            row.setPosition(0, top - i * stepY, 0);
+            this._drawRoundRect(row, rowW, rowH, new Color(18, 17, 62, 235), 14);
+            board.addChild(row);
+
+            const nameNode = new Node('Name');
+            nameNode.layer = Layers.Enum.UI_2D;
+            nameNode.addComponent(UITransform).setContentSize(rowW * 0.6, 34);
+            const nLab = nameNode.addComponent(Label);
+            nLab.string = task.name;
+            nLab.fontSize = 32;
+            nLab.lineHeight = 36;
+            nLab.color = new Color(255, 255, 255, 255);
+            nameNode.setPosition(-rowW * 0.18, 28, 0);
+            row.addChild(nameNode);
+
+            const progressNode = new Node('Progress');
+            progressNode.layer = Layers.Enum.UI_2D;
+            progressNode.addComponent(UITransform).setContentSize(rowW * 0.62, 28);
+            const progLab = progressNode.addComponent(Label);
+            progLab.string = '';
+            progLab.fontSize = 22;
+            progLab.lineHeight = 26;
+            progLab.color = new Color(225, 225, 240, 255);
+            progressNode.setPosition(-rowW * 0.18, -18, 0);
+            row.addChild(progressNode);
+
+            const statusNode = new Node('Status');
+            statusNode.layer = Layers.Enum.UI_2D;
+            statusNode.addComponent(UITransform).setContentSize(130, 30);
+            const statusLab = statusNode.addComponent(Label);
+            statusLab.string = '';
+            statusLab.fontSize = 22;
+            statusLab.lineHeight = 26;
+            statusLab.color = new Color(188, 209, 255, 255);
+            statusNode.setPosition(-rowW * 0.18, -48, 0);
+            row.addChild(statusNode);
+
+            const claimBtn = new Node('ClaimBtn');
+            claimBtn.layer = Layers.Enum.UI_2D;
+            claimBtn.addComponent(UITransform).setContentSize(140, 72);
+            claimBtn.setPosition(rowW * 0.36, 0, 0);
+            this._drawRoundRect(claimBtn, 140, 72, new Color(50, 69, 160, 255), 12);
+            const claimText = new Node('ClaimText');
+            claimText.layer = Layers.Enum.UI_2D;
+            claimText.addComponent(UITransform).setContentSize(132, 64);
+            claimText.setPosition(0, 0, 0);
+            const btnLab = claimText.addComponent(Label);
+            btnLab.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+            btnLab.fontSize = 24;
+            btnLab.lineHeight = 28;
+            btnLab.color = new Color(255, 255, 255, 255);
+            (btnLab as any).horizontalAlign = 1; // center
+            claimBtn.addChild(claimText);
+            claimBtn.on(Input.EventType.TOUCH_END, (evt: any) => {
+                evt?.stopPropagation?.();
+                const r = this.taskManager.claim(task.id);
+                if (r.ok) {
+                    this._addTaskPoints(Math.floor(r.reward?.coins ?? 0));
+                }
+                this._refreshTaskPanel();
+            }, this);
+            claimBtn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                evt?.stopPropagation?.();
+                const r = this.taskManager.claim(task.id);
+                if (r.ok) {
+                    this._addTaskPoints(Math.floor(r.reward?.coins ?? 0));
+                }
+                this._refreshTaskPanel();
+            }, this);
+            row.addChild(claimBtn);
+
+            this.taskRows.push({ taskId: task.id, progressLabel: progLab, claimLabel: btnLab, statusLabel: statusLab });
+        }
+
+        this.uiCanvas.addChild(root);
+        this.taskPanelNode = root;
+        this._refreshTaskPanel();
+        this._refreshTaskHUD();
+        tween(mask).to(0.15, { opacity: 255 }, { easing: 'quadOut' }).start();
+    }
+
+    private _refreshTaskPanel(): void {
+        if (!this.taskPanelNode || !this.taskPanelNode.isValid) return;
+        const tasks = this.taskManager.getTasks();
+        const byId = new Map(tasks.map((t) => [t.id, t]));
+        for (const row of this.taskRows) {
+            const task = byId.get(row.taskId);
+            if (!task) continue;
+            row.progressLabel.string = this._buildTaskProgressBar(task.progress, task.target_value);
+            if (task.claimed) {
+                row.statusLabel.string = '已领取';
+                row.claimLabel.string = '已领';
+                row.claimLabel.color = new Color(200, 210, 225, 255);
+            } else if (task.is_completed) {
+                row.statusLabel.string = '可领取';
+                row.claimLabel.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+                row.claimLabel.color = new Color(255, 255, 255, 255);
+            } else {
+                row.statusLabel.string = '进行中';
+                row.claimLabel.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+                row.claimLabel.color = new Color(220, 220, 220, 235);
+            }
+        }
+        this._refreshTaskHUD();
+    }
+
+    private _hideTaskPanel(): void {
+        if (!this.taskPanelNode || !this.taskPanelNode.isValid) return;
+        const target = this.taskPanelNode;
+        const op = target.getComponent(UIOpacity) || target.addComponent(UIOpacity);
+        tween(op)
+            .to(0.12, { opacity: 0 }, { easing: 'quadIn' })
+            .call(() => {
+                if (target && target.isValid) {
+                    target.removeFromParent();
+                    target.destroy();
+                }
+                if (this.taskPanelNode === target) {
+                    this.taskPanelNode = null;
+                    this.taskPanelPointsLabel = null;
+                    this.taskRows = [];
+                }
+            })
+            .start();
+    }
+
     // —— 自适配 UI 布局：把分数锚到屏幕右上角，适配不同机型 ——
     private _onWindowResize = () => this._applyUILayout();
     private _applyUILayout(): void {
@@ -409,18 +862,24 @@ export class StackGame extends Component {
         // 自适应边距：随分辨率变化，防止 750x1334 下过于居中
         // 将主分数更贴近右上角，减少偏移
         const FIX_RIGHT_MARGIN = Math.max(36, Math.min(80, w * 0.06)); // 约 45px@750, 65px@1080
-        const FIX_TOP_MARGIN   = Math.max(60, Math.min(120, h * 0.08)); // 约 107px@1334, 187px@2340
+        const FIX_TOP_MARGIN   = Math.max(70, Math.min(140, h * 0.103)); // 约 107px@1334, 187px@2340
+        const MAIN_SCORE_X_OFFSET = -12; // 仅主分数水平偏移：负数向左，正数向右
+        const TASK_ENTRY_RIGHT_MARGIN = 80; // 任务图标距屏幕右侧：值越小越靠右
 
         // 右上角：主分数（锚点在右上），固定边距
+        let mainScoreFontSize = Math.round(36 * scale);
+        let mainScoreLineHeight = Math.round(40 * scale);
         if (this.mainScoreLabelNode && this.mainScoreLabelNode.isValid) {
             const ui = this.mainScoreLabelNode.getComponent(UITransform) || this.mainScoreLabelNode.addComponent(UITransform);
             ui.setAnchorPoint(1, 1);
-            this.mainScoreLabelNode.setPosition(w * 0.5 - FIX_RIGHT_MARGIN, h * 0.5 - FIX_TOP_MARGIN, 0);
+            this.mainScoreLabelNode.setPosition(w * 0.5 - FIX_RIGHT_MARGIN + MAIN_SCORE_X_OFFSET, h * 0.5 - FIX_TOP_MARGIN, 0);
 
             const lab = this.mainScoreLabelNode.getComponent(Label);
             if (lab) {
-                lab.fontSize = Math.round(36 * scale);
-                lab.lineHeight = Math.round(40 * scale);
+                lab.fontSize = mainScoreFontSize;
+                lab.lineHeight = mainScoreLineHeight;
+                mainScoreFontSize = lab.fontSize;
+                mainScoreLineHeight = lab.lineHeight;
             }
         }
 
@@ -436,6 +895,46 @@ export class StackGame extends Component {
             if (lab) {
                 lab.fontSize = Math.round(48 * scale);
                 lab.lineHeight = Math.round(52 * scale);
+            }
+        }
+
+        // 右上角：任务积分（菱形）
+        if (this.taskPointsNode && this.taskPointsNode.isValid) {
+            const ui = this.taskPointsNode.getComponent(UITransform) || this.taskPointsNode.addComponent(UITransform);
+            ui.setAnchorPoint(1, 1);
+            // 固定边距定位：换分辨率时保持稳定，不按屏幕比例漂移
+            const TASK_HUD_RIGHT_MARGIN = 52;
+            const TASK_HUD_TOP_MARGIN = 168;
+            // TaskPoints 子节点里菱形行本地偏移是 +28，因此根节点额外减去 28
+            const taskNodeX = w * 0.5 - TASK_HUD_RIGHT_MARGIN;
+            const taskNodeY = h * 0.5 - TASK_HUD_TOP_MARGIN - 28;
+            this.taskPointsNode.setPosition(taskNodeX, taskNodeY, 0);
+
+            // 数字与菱形图标解耦：单独调其中一个不会影响另一个
+            const TASK_POINTS_VALUE_FONT_SIZE = Math.round(34 * scale);
+            const TASK_POINTS_VALUE_LINE_HEIGHT = Math.round(38 * scale);
+            const TASK_POINTS_ICON_FONT_SIZE = Math.round(42 * scale);
+            const TASK_POINTS_ICON_LINE_HEIGHT = Math.round(42 * scale);
+            if (this.taskPointsLabel && this.taskPointsLabel.isValid) {
+                this.taskPointsLabel.fontSize = TASK_POINTS_VALUE_FONT_SIZE*1.4;
+                this.taskPointsLabel.lineHeight = TASK_POINTS_VALUE_LINE_HEIGHT*1.4;
+            }
+            if (this.taskPointsDiamondIconLabel && this.taskPointsDiamondIconLabel.isValid) {
+                this.taskPointsDiamondIconLabel.fontSize = TASK_POINTS_ICON_FONT_SIZE;
+                this.taskPointsDiamondIconLabel.lineHeight = TASK_POINTS_ICON_LINE_HEIGHT;
+            }
+        }
+
+        // 右侧中部：任务入口图标（同心圆）
+        if (this.taskEntryButtonNode && this.taskEntryButtonNode.isValid) {
+            const ui = this.taskEntryButtonNode.getComponent(UITransform) || this.taskEntryButtonNode.addComponent(UITransform);
+            ui.setAnchorPoint(1, 0.5);
+            this.taskEntryButtonNode.setPosition(w * 0.5 - TASK_ENTRY_RIGHT_MARGIN, 0, 0);
+            ui.setContentSize(Math.round(120 * scale), Math.round(120 * scale));
+            const iconNode = this.taskEntryButtonNode.getChildByName('TaskEntryIcon');
+            if (iconNode && iconNode.isValid) {
+                const iconUI = iconNode.getComponent(UITransform) || iconNode.addComponent(UITransform);
+                iconUI.setContentSize(Math.round(88 * scale), Math.round(88 * scale));
             }
         }
     }
@@ -535,6 +1034,11 @@ export class StackGame extends Component {
         }
         // 6) 交给 FriendRankView 统一创建/布局好友榜入口
         FriendRankView.ensureButton(canvas);
+        if (this.taskPoints === 0) {
+            this._loadTaskPoints();
+        }
+        this._ensureTaskHUD();
+        this._bringTaskHUDToFront();
         // —— 自动适配布局 ——
         this._applyUILayout();
     }
@@ -627,6 +1131,7 @@ export class StackGame extends Component {
         this.startOverlayNode = n;
         // 让好友榜按钮浮在遮罩之上，便于点击
         FriendRankView.bringButtonToFront(this.uiCanvas);
+        this._bringTaskHUDToFront();
 
         // 淡入
         tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
@@ -635,14 +1140,14 @@ export class StackGame extends Component {
         if (this.startOnTap) {
             n.on(Input.EventType.TOUCH_START, (evt: any) => {
                 // 如果点在好友榜按钮上，则不处理开始
-                if (this._isEventOnFriendRankUI(evt)) return;
+                if (this._isEventOnFriendRankUI(evt) || this._isEventOnTaskUI(evt)) return;
                 evt?.stopPropagationImmediate?.();
                 evt?.stopPropagation?.();
                 (evt as any)?.preventSwallow && ((evt as any).preventSwallow = false); // 兼容处理，无副作用
                 this._handleStartTap();
             }, this);
             n.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
-                if (this._isEventOnFriendRankUI(evt)) return;
+                if (this._isEventOnFriendRankUI(evt) || this._isEventOnTaskUI(evt)) return;
                 evt?.stopPropagationImmediate?.();
                 evt?.stopPropagation?.();
                 this._handleStartTap();
@@ -1164,6 +1669,14 @@ export class StackGame extends Component {
     }
 
     start() {
+        try {
+            const configs = _resolveDailyTaskConfigs(dailyTaskConfigs);
+            this.taskManager.init(configs);
+            this._reportTask('login', 1);
+        } catch (err) {
+            console.warn('[Task] init failed, continue without task progress updates in this session.', err);
+        }
+
         // 复活状态初始化
         this._reviveCount = 0;
         this._reviveRequesting = false;
@@ -1257,7 +1770,17 @@ export class StackGame extends Component {
     onDisable() {
         // 停止定时器和 UI 动画，避免在节点被禁用/销毁后继续触发微信原生视图
         this.unscheduleAllCallbacks();
-        const toStop = [this.node, this.uiCanvas, this.startOverlayNode, this.gameOverOverlayNode, this._reviveOverlayNode, this.comboBadgeNode];
+        const toStop = [
+            this.node,
+            this.uiCanvas,
+            this.startOverlayNode,
+            this.gameOverOverlayNode,
+            this._reviveOverlayNode,
+            this.comboBadgeNode,
+            this.taskEntryButtonNode,
+            this.taskPointsNode,
+            this.taskPanelNode,
+        ];
         toStop.forEach(n => { if (n && n.isValid) Tween.stopAllByTarget(n); });
     }
 
@@ -1269,7 +1792,14 @@ export class StackGame extends Component {
             this.bgmSource.stop();
         }
         this.onDisable();
-        const toDispose = [this.startOverlayNode, this.gameOverOverlayNode, this._reviveOverlayNode];
+        const toDispose = [
+            this.startOverlayNode,
+            this.gameOverOverlayNode,
+            this._reviveOverlayNode,
+            this.taskPanelNode,
+            this.taskEntryButtonNode,
+            this.taskPointsNode,
+        ];
         toDispose.forEach(n => {
             if (n && n.isValid) {
                 n.removeFromParent();
@@ -1279,6 +1809,12 @@ export class StackGame extends Component {
         this.startOverlayNode = null;
         this.gameOverOverlayNode = null;
         this._reviveOverlayNode = null;
+        this.taskPanelNode = null;
+        this.taskEntryButtonNode = null;
+        this.taskPointsNode = null;
+        this.taskPointsLabel = null;
+        this.taskPointsDiamondIconLabel = null;
+        this.taskRows = [];
         this._leaderboardViews = [];
     }
 
@@ -1738,6 +2274,8 @@ export class StackGame extends Component {
     private _finalizeGameOver(): void {
         if (this._gameOverFinalized) return;
         this._gameOverFinalized = true;
+        this._reportTask('play_count', 1);
+        this._reportTask('reach_score', Math.floor(this.points), 'set-max');
         this.isGameOver = true;
         this._hideReviveOverlay();
         // BGM 淡出
@@ -1897,6 +2435,7 @@ export class StackGame extends Component {
         this.gameOverOverlayNode = n;
         // 让好友榜按钮浮在结束遮罩之上，便于点击
         FriendRankView.bringButtonToFront(this.uiCanvas);
+        this._bringTaskHUDToFront();
 
         // 淡入
         tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
@@ -2083,6 +2622,10 @@ export class StackGame extends Component {
         if (this._isFriendRankActive() || (evt && this._isEventOnFriendRankUI(evt))) {
             return;
         }
+        // 任务入口/任务面板上的触摸不应触发开始或落块
+        if (evt && this._isEventOnTaskUI(evt)) {
+            return;
+        }
         if (this.isWaitingStart) { 
             this._handleStartTap(); 
             return; 
@@ -2119,6 +2662,7 @@ export class StackGame extends Component {
             if (excessSize === 0) {
                     // 完美堆叠
                     wasPerfect = true;
+                    this._reportTask('perfect_stack', 1);
                     this.playPerfectStackWithCombo();
                     this.comboCount += 1; // 连击 +1（放到播放之后，使第一次完美播放基础音效）
                     this.showPerfectEffect(this.movingBlock.position); // 显示完美堆叠特效
@@ -2252,6 +2796,7 @@ export class StackGame extends Component {
             this.baseBlock = this.movingBlock;
 
             this.score += 1;
+            this._reportTask('reach_layers', 1);
 
             // 计分：主显示总分（含完美/连击奖励），副显示层数
             this._addPointsForPlacement(wasPerfect);

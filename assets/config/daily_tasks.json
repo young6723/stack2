@@ -1,0 +1,62 @@
+[
+  {
+    "id": "d_login_1",
+    "name": "今日登录",
+    "desc": "登录游戏 1 次",
+    "type": "login",
+    "target_value": 1,
+    "reward": {
+      "coins": 50
+    },
+    "sort_order": 1,
+    "is_active": true
+  },
+  {
+    "id": "d_play_3",
+    "name": "进行3局",
+    "desc": "完成任意对局 3 次",
+    "type": "play_count",
+    "target_value": 3,
+    "reward": {
+      "coins": 100
+    },
+    "sort_order": 2,
+    "is_active": true
+  },
+  {
+    "id": "d_layer_20",
+    "name": "累计20层",
+    "desc": "累计完成 20 次成功叠层",
+    "type": "reach_layers",
+    "target_value": 20,
+    "reward": {
+      "coins": 150
+    },
+    "sort_order": 3,
+    "is_active": true
+  },
+  {
+    "id": "d_perfect_5",
+    "name": "完美5次",
+    "desc": "达成完美堆叠 5 次",
+    "type": "perfect_stack",
+    "target_value": 5,
+    "reward": {
+      "coins": 120
+    },
+    "sort_order": 4,
+    "is_active": true
+  },
+  {
+    "id": "d_score_1000",
+    "name": "单局1000分",
+    "desc": "单局分数达到 1000",
+    "type": "reach_score",
+    "target_value": 1000,
+    "reward": {
+      "coins": 180
+    },
+    "sort_order": 5,
+    "is_active": true
+  }
+]

@@ -1560,6 +1560,22 @@
         "separateEngine": false,
         "highPerformanceMode": false,
         "__version__": "1.0.4"
+      },
+      "1772331535179": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1772446653534": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
       }
     },
     "__version__": "1.3.9",
