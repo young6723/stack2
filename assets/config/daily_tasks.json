@@ -6,7 +6,7 @@
     "type": "login",
     "target_value": 1,
     "reward": {
-      "coins": 50
+      "coins": 5
     },
     "sort_order": 1,
     "is_active": true
@@ -18,31 +18,31 @@
     "type": "play_count",
     "target_value": 3,
     "reward": {
-      "coins": 100
+      "coins": 10
     },
     "sort_order": 2,
     "is_active": true
   },
   {
-    "id": "d_layer_20",
-    "name": "累计20层",
-    "desc": "累计完成 20 次成功叠层",
+    "id": "d_single_layer_80",
+    "name": "单局累计80层",
+    "desc": "单局内累计达到 80 层",
     "type": "reach_layers",
-    "target_value": 20,
+    "target_value": 80,
     "reward": {
-      "coins": 150
+      "coins": 15
     },
     "sort_order": 3,
     "is_active": true
   },
   {
     "id": "d_perfect_5",
-    "name": "完美5次",
-    "desc": "达成完美堆叠 5 次",
+    "name": "连续完美5次",
+    "desc": "单局内连续达成完美堆叠 5 次",
     "type": "perfect_stack",
     "target_value": 5,
     "reward": {
-      "coins": 120
+      "coins": 12
     },
     "sort_order": 4,
     "is_active": true
@@ -54,7 +54,7 @@
     "type": "reach_score",
     "target_value": 1000,
     "reward": {
-      "coins": 180
+      "coins": 18
     },
     "sort_order": 5,
     "is_active": true

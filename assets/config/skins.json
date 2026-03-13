@@ -1,0 +1,105 @@
+[
+  {
+    "id": "classic",
+    "name": "Classic",
+    "rarity": "basic",
+    "price": 0,
+    "is_default": true,
+    "profile": {
+      "hue_start": 180,
+      "hue_step": 10,
+      "sat_base": 0.58,
+      "sat_var": 0.1,
+      "light_base": 0.62,
+      "light_var": 0.06,
+      "level_brighten": 0.002,
+      "background_sat_scale": 0.22,
+      "background_light_boost": 0.2
+    }
+  },
+  {
+    "id": "mint",
+    "name": "Mint",
+    "rarity": "rare",
+    "price": 120,
+    "profile": {
+      "hue_start": 135,
+      "hue_step": 6,
+      "sat_base": 0.45,
+      "sat_var": 0.08,
+      "light_base": 0.72,
+      "light_var": 0.05,
+      "level_brighten": 0.0018,
+      "background_sat_scale": 0.18,
+      "background_light_boost": 0.24
+    }
+  },
+  {
+    "id": "sunset",
+    "name": "Sunset",
+    "rarity": "rare",
+    "price": 180,
+    "profile": {
+      "hue_start": 12,
+      "hue_step": 7,
+      "sat_base": 0.62,
+      "sat_var": 0.09,
+      "light_base": 0.6,
+      "light_var": 0.07,
+      "level_brighten": 0.0016,
+      "background_sat_scale": 0.2,
+      "background_light_boost": 0.18
+    }
+  },
+  {
+    "id": "ocean",
+    "name": "Ocean",
+    "rarity": "epic",
+    "price": 260,
+    "profile": {
+      "hue_start": 210,
+      "hue_step": 8,
+      "sat_base": 0.56,
+      "sat_var": 0.08,
+      "light_base": 0.54,
+      "light_var": 0.06,
+      "level_brighten": 0.0019,
+      "background_sat_scale": 0.2,
+      "background_light_boost": 0.2
+    }
+  },
+  {
+    "id": "neon",
+    "name": "Neon",
+    "rarity": "epic",
+    "price": 360,
+    "profile": {
+      "hue_start": 290,
+      "hue_step": 14,
+      "sat_base": 0.72,
+      "sat_var": 0.06,
+      "light_base": 0.57,
+      "light_var": 0.08,
+      "level_brighten": 0.0024,
+      "background_sat_scale": 0.24,
+      "background_light_boost": 0.14
+    }
+  },
+  {
+    "id": "royal",
+    "name": "Royal",
+    "rarity": "special",
+    "price": 520,
+    "profile": {
+      "hue_start": 262,
+      "hue_step": 4,
+      "sat_base": 0.5,
+      "sat_var": 0.05,
+      "light_base": 0.48,
+      "light_var": 0.05,
+      "level_brighten": 0.0016,
+      "background_sat_scale": 0.18,
+      "background_light_boost": 0.15
+    }
+  }
+]

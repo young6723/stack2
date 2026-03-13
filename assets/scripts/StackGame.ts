@@ -2,7 +2,9 @@
 import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, tween, Tween, Color, Mesh, MeshRenderer, AudioSource, AudioClip, UIOpacity, screen, view, Material, EventKeyboard, KeyCode, Label, UITransform, Canvas, Camera, Layers, director, LabelOutline, LabelShadow, Vec2, sys, Graphics, BlockInputEvents } from 'cc';
 import { FriendRankView } from './FriendRankView';
 import { DailyTaskConfig, TaskManager } from './TaskManager';
+import { SkinConfig, SkinManager, SkinRarity } from './SkinManager';
 import * as dailyTaskConfigs from '../config/daily_tasks.json';
+import * as skinConfigs from '../config/skins.json';
 declare const wx: any;
 type LeaderboardRowRefs = {
     rankLabel: Label;
@@ -23,18 +25,35 @@ type LeaderboardView = {
 };
 type DailyTaskRowRefs = {
     taskId: string;
+    rowNode: Node;
+    claimBtnNode: Node;
     progressLabel: Label;
     claimLabel: Label;
     statusLabel: Label;
 };
+type SkinCardRefs = {
+    skinId: string;
+    cardNode: Node;
+    actionNode: Node;
+    nameLabel: Label;
+    priceLabel: Label;
+    actionLabel: Label;
+    statusLabel: Label;
+    previewNodes: Node[];
+};
 
 
 const LB_KEY = 'stack_leaderboard_v1';
-const DAILY_TASK_POINTS_KEY = 'daily_task_points_v1';
+const DAILY_TASK_POINTS_KEY = 'daily_task_points_v2';
 function _resolveDailyTaskConfigs(raw: unknown): DailyTaskConfig[] {
     const maybeDefault = (raw as { default?: unknown })?.default;
     const list = Array.isArray(maybeDefault) ? maybeDefault : raw;
     return Array.isArray(list) ? (list as DailyTaskConfig[]) : [];
+}
+function _resolveSkinConfigs(raw: unknown): SkinConfig[] {
+    const maybeDefault = (raw as { default?: unknown })?.default;
+    const list = Array.isArray(maybeDefault) ? maybeDefault : raw;
+    return Array.isArray(list) ? (list as SkinConfig[]) : [];
 }
 const { ccclass, property } = _decorator;
 
@@ -125,14 +144,23 @@ export class StackGame extends Component {
     private subLayerLabelNode: Node = null;     // 副显示 Label（层数）
     private comboBadgeNode: Node = null;        // 连击徽章（UI 动态创建）
     private taskEntryButtonNode: Node = null;   // 右侧任务入口图标
+    private skinEntryButtonNode: Node = null;   // 左侧皮肤入口图标
     private taskPointsNode: Node = null;        // 右上角任务积分展示
     private taskPointsLabel: Label = null;
     private taskPointsDiamondIconLabel: Label = null;
     private taskPanelNode: Node = null;         // 任务面板
     private taskPanelPointsLabel: Label = null;
     private taskRows: DailyTaskRowRefs[] = [];
+    private taskHintedCompletions: Set<string> = new Set();
+    private skinPanelNode: Node = null;
+    private skinPanelPointsLabel: Label = null;
+    private skinPanelOwnedLabel: Label = null;
+    private skinCards: SkinCardRefs[] = [];
+    private skinTabNodes: Map<SkinRarity, Node> = new Map();
+    private selectedSkinRarity: SkinRarity = 'basic';
     private taskPoints: number = 0;
     private _lastTaskEntryClickAt: number = 0;
+    private _lastSkinEntryClickAt: number = 0;
     // —— Start Overlay —— 
     @property
     startOnTap: boolean = true; // 允许点击屏幕/按键开始
@@ -219,6 +247,8 @@ export class StackGame extends Component {
         if (!loc) return false;
         if (this._isPointInUINode(this.taskEntryButtonNode, loc)) return true;
         if (this._isPointInUINode(this.taskPanelNode, loc)) return true;
+        if (this._isPointInUINode(this.skinEntryButtonNode, loc)) return true;
+        if (this._isPointInUINode(this.skinPanelNode, loc)) return true;
         return false;
     }
     private direction: number = 1;
@@ -266,6 +296,7 @@ export class StackGame extends Component {
     private score: number = 0;
     private points: number = 0;     // 总分（主显示）
     private readonly taskManager = TaskManager.getInstance();
+    private readonly skinManager = SkinManager.getInstance();
     private _matColorKey: string | null = null; // 记录当前材质颜色属性键（兼容 albedo/mainColor/baseColor/u_color/color）
     private moveAxis: 'x' | 'z' = 'z'; // 初始为 z 轴
 
@@ -452,6 +483,18 @@ export class StackGame extends Component {
         this.taskPoints += v;
         this._saveTaskPoints();
         this._refreshTaskHUD();
+        this._refreshSkinPanel();
+    }
+
+    private _spendTaskPoints(delta: number): boolean {
+        const v = Math.max(0, Math.floor(delta));
+        if (v <= 0) return true;
+        if (this.taskPoints < v) return false;
+        this.taskPoints -= v;
+        this._saveTaskPoints();
+        this._refreshTaskHUD();
+        this._refreshSkinPanel();
+        return true;
     }
 
     private _reportTask(type: 'login' | 'play_count' | 'reach_layers' | 'perfect_stack' | 'reach_score', value: number = 1, mode: 'inc' | 'set-max' = 'inc'): void {
@@ -497,11 +540,101 @@ export class StackGame extends Component {
         gfx.stroke();
     }
 
+    private _drawSkinEntryIcon(node: Node): void {
+        let gfx = node.getComponent(Graphics);
+        if (!gfx) gfx = node.addComponent(Graphics);
+        gfx.clear();
+        const drawDiamond = (centerX: number, centerY: number, width: number, height: number, fill: Color): void => {
+            const halfW = width * 0.5;
+            const halfH = height * 0.5;
+            gfx.fillColor = fill;
+            gfx.moveTo(centerX, centerY + halfH);
+            gfx.lineTo(centerX + halfW, centerY);
+            gfx.lineTo(centerX, centerY - halfH);
+            gfx.lineTo(centerX - halfW, centerY);
+            gfx.close();
+            gfx.fill();
+        };
+        const drawDiamondThickness = (
+            centerX: number,
+            centerY: number,
+            width: number,
+            height: number,
+            thickness: number,
+            rightFace: Color,
+            leftFace: Color
+        ): void => {
+            const halfW = width * 0.5;
+            const halfH = height * 0.5;
+            const bx = centerX;
+            const by = centerY - halfH;
+            const rx = centerX + halfW;
+            const ry = centerY;
+            const lx = centerX - halfW;
+            const ly = centerY;
+
+            // Right lower face
+            gfx.fillColor = rightFace;
+            gfx.moveTo(rx, ry);
+            gfx.lineTo(bx, by);
+            gfx.lineTo(bx, by - thickness);
+            gfx.lineTo(rx, ry - thickness);
+            gfx.close();
+            gfx.fill();
+
+            // Left lower face
+            gfx.fillColor = leftFace;
+            gfx.moveTo(lx, ly);
+            gfx.lineTo(bx, by);
+            gfx.lineTo(bx, by - thickness);
+            gfx.lineTo(lx, ly - thickness);
+            gfx.close();
+            gfx.fill();
+        };
+
+        const width = 58;
+        const height = 28;
+        const stepY = 14;
+        const centerX = 0;
+        const startY = 22;
+        const thickness = 4;
+
+        const shadowColor = new Color(145, 178, 172, 145);
+        const topColor = new Color(255, 255, 255, 248);
+        const topRightFace = new Color(150, 182, 176, 195);
+        const topLeftFace = new Color(166, 196, 191, 195);
+        const edgeGlow = new Color(255, 255, 255, 130);
+
+        drawDiamond(centerX + 2, startY - stepY * 2 - 2, width, height, shadowColor);
+        drawDiamond(centerX + 2, startY - stepY - 2, width, height, shadowColor);
+        drawDiamond(centerX + 2, startY - 2, width, height, shadowColor);
+
+        // Bottom tip faces front (toward screen bottom)
+        drawDiamond(centerX, startY - stepY * 2, width, height, topColor);
+        drawDiamondThickness(centerX, startY - stepY * 2, width, height, thickness, topRightFace, topLeftFace);
+        drawDiamond(centerX, startY - stepY, width, height, topColor);
+        drawDiamondThickness(centerX, startY - stepY, width, height, thickness, topRightFace, topLeftFace);
+        drawDiamond(centerX, startY, width, height, topColor);
+        drawDiamondThickness(centerX, startY, width, height, thickness, topRightFace, topLeftFace);
+
+        gfx.lineWidth = 2.5;
+        gfx.strokeColor = edgeGlow;
+        const halfW = width * 0.5;
+        const halfH = height * 0.5;
+        const drawTopHighlight = (y: number) => {
+            gfx.moveTo(centerX - halfW * 0.55, y + halfH * 0.45);
+            gfx.lineTo(centerX, y + halfH * 0.78);
+            gfx.lineTo(centerX + halfW * 0.55, y + halfH * 0.45);
+            gfx.stroke();
+        };
+        drawTopHighlight(startY - stepY * 2);
+        drawTopHighlight(startY - stepY);
+        drawTopHighlight(startY);
+    }
+
     private _buildTaskProgressBar(progress: number, target: number, slots: number = 12): string {
         const safeTarget = Math.max(1, target);
-        const ratio = Math.max(0, Math.min(1, progress / safeTarget));
-        const filled = Math.round(ratio * slots);
-        return `[${'■'.repeat(filled)}${'·'.repeat(Math.max(0, slots - filled))}] ${progress}/${safeTarget}`;
+        return `${progress}/${safeTarget}`;
     }
 
     private _ensureTaskHUD(): void {
@@ -551,7 +684,7 @@ export class StackGame extends Component {
             const btn = new Node('TaskEntry');
             btn.layer = Layers.Enum.UI_2D;
             const btnUI = btn.addComponent(UITransform);
-            btnUI.setContentSize(120, 120);
+            btnUI.setContentSize(94, 94);
             if (!btn.getComponent(BlockInputEvents)) {
                 btn.addComponent(BlockInputEvents);
             }
@@ -579,6 +712,41 @@ export class StackGame extends Component {
             this._rememberBaseScale(this.taskEntryButtonNode);
         }
 
+        if (!this.skinEntryButtonNode || !this.skinEntryButtonNode.isValid) {
+            const btn = new Node('SkinEntry');
+            btn.layer = Layers.Enum.UI_2D;
+            const btnUI = btn.addComponent(UITransform);
+            btnUI.setContentSize(112, 120);
+            if (!btn.getComponent(BlockInputEvents)) {
+                btn.addComponent(BlockInputEvents);
+            }
+
+            const iconNode = new Node('SkinEntryIcon');
+            iconNode.layer = Layers.Enum.UI_2D;
+            iconNode.addComponent(UITransform).setContentSize(110, 110);
+            iconNode.setPosition(0, 10, 0);
+            this._drawSkinEntryIcon(iconNode);
+            btn.addChild(iconNode);
+
+            btn.on(Input.EventType.TOUCH_START, (evt: any) => {
+                evt?.stopPropagation?.();
+            }, this);
+            btn.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
+                evt?.stopPropagation?.();
+            }, this);
+            btn.on(Input.EventType.TOUCH_END, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleSkinEntryClick();
+            }, this);
+            btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleSkinEntryClick();
+            }, this);
+            this.uiCanvas.addChild(btn);
+            this.skinEntryButtonNode = btn;
+            this._rememberBaseScale(this.skinEntryButtonNode);
+        }
+
         this._refreshTaskHUD();
     }
 
@@ -587,7 +755,10 @@ export class StackGame extends Component {
             this.taskPointsLabel.string = `${this.taskPoints}`;
         }
         if (this.taskPanelPointsLabel && this.taskPanelPointsLabel.isValid) {
-            this.taskPanelPointsLabel.string = `积分 ${this.taskPoints}`;
+            this.taskPanelPointsLabel.string = `${this.taskPoints} ◆`;
+        }
+        if (this.skinPanelPointsLabel && this.skinPanelPointsLabel.isValid) {
+            this.skinPanelPointsLabel.string = `${this.taskPoints} ◆`;
         }
     }
 
@@ -597,6 +768,9 @@ export class StackGame extends Component {
         }
         if (this.taskEntryButtonNode && this.taskEntryButtonNode.isValid) {
             this.taskEntryButtonNode.setSiblingIndex(Number.MAX_SAFE_INTEGER);
+        }
+        if (this.skinEntryButtonNode && this.skinEntryButtonNode.isValid) {
+            this.skinEntryButtonNode.setSiblingIndex(Number.MAX_SAFE_INTEGER);
         }
     }
 
@@ -624,6 +798,7 @@ export class StackGame extends Component {
     private _showTaskPanel(): void {
         if (!this._isAlive(this.uiCanvas)) return;
         if (this.taskPanelNode && this.taskPanelNode.isValid) return;
+        this._hideSkinPanel();
 
         let w = 750, h = 1334;
         try {
@@ -671,7 +846,7 @@ export class StackGame extends Component {
         pLab.fontSize = 30;
         pLab.lineHeight = 34;
         pLab.color = new Color(255, 255, 255, 230);
-        points.setPosition(bw * 0.26, bh * 0.42, 0);
+        points.setPosition(bw * 0.33, bh * 0.42, 0);
         board.addChild(points);
         this.taskPanelPointsLabel = pLab;
 
@@ -695,6 +870,7 @@ export class StackGame extends Component {
         board.addChild(close);
 
         this.taskRows = [];
+        this.taskHintedCompletions.clear();
         const tasks = this.taskManager.getTasks();
         const top = bh * 0.28;
         const stepY = 150;
@@ -752,7 +928,7 @@ export class StackGame extends Component {
             claimText.addComponent(UITransform).setContentSize(132, 64);
             claimText.setPosition(0, 0, 0);
             const btnLab = claimText.addComponent(Label);
-            btnLab.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+            btnLab.string = `${Math.floor(task.reward?.coins ?? 0)}♦`;
             btnLab.fontSize = 24;
             btnLab.lineHeight = 28;
             btnLab.color = new Color(255, 255, 255, 255);
@@ -776,7 +952,14 @@ export class StackGame extends Component {
             }, this);
             row.addChild(claimBtn);
 
-            this.taskRows.push({ taskId: task.id, progressLabel: progLab, claimLabel: btnLab, statusLabel: statusLab });
+            this.taskRows.push({
+                taskId: task.id,
+                rowNode: row,
+                claimBtnNode: claimBtn,
+                progressLabel: progLab,
+                claimLabel: btnLab,
+                statusLabel: statusLab
+            });
         }
 
         this.uiCanvas.addChild(root);
@@ -794,18 +977,40 @@ export class StackGame extends Component {
             const task = byId.get(row.taskId);
             if (!task) continue;
             row.progressLabel.string = this._buildTaskProgressBar(task.progress, task.target_value);
+            const rowUI = row.rowNode.getComponent(UITransform);
+            const claimUI = row.claimBtnNode.getComponent(UITransform);
+            const rowW = rowUI?.contentSize.width ?? 600;
+            const rowH = rowUI?.contentSize.height ?? 120;
+            const claimW = claimUI?.contentSize.width ?? 140;
+            const claimH = claimUI?.contentSize.height ?? 72;
             if (task.claimed) {
-                row.statusLabel.string = '已领取';
+                row.statusLabel.string = '';
                 row.claimLabel.string = '已领';
                 row.claimLabel.color = new Color(200, 210, 225, 255);
+                row.progressLabel.color = new Color(200, 210, 225, 220);
+                this._drawRoundRect(row.rowNode, rowW, rowH, new Color(18, 17, 62, 220), 14);
+                this._drawRoundRect(row.claimBtnNode, claimW, claimH, new Color(66, 83, 136, 255), 12);
+                this.taskHintedCompletions.delete(task.id);
             } else if (task.is_completed) {
-                row.statusLabel.string = '可领取';
-                row.claimLabel.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+                row.statusLabel.string = '';
+                row.claimLabel.string = `${Math.floor(task.reward?.coins ?? 0)}♦`;
                 row.claimLabel.color = new Color(255, 255, 255, 255);
+                row.progressLabel.color = new Color(242, 255, 225, 255);
+                this._drawRoundRect(row.rowNode, rowW, rowH, new Color(36, 66, 128, 245), 14);
+                this._drawRoundRect(row.claimBtnNode, claimW, claimH, new Color(72, 130, 255, 255), 12);
+                if (!this.taskHintedCompletions.has(task.id)) {
+                    this.taskHintedCompletions.add(task.id);
+                    this._punchScale(row.rowNode, 0.05, 0.18);
+                    this._punchScale(row.claimBtnNode, 0.08, 0.20);
+                }
             } else {
-                row.statusLabel.string = '进行中';
-                row.claimLabel.string = `领 ${Math.floor(task.reward?.coins ?? 0)}♦`;
+                row.statusLabel.string = '';
+                row.claimLabel.string = `${Math.floor(task.reward?.coins ?? 0)}♦`;
                 row.claimLabel.color = new Color(220, 220, 220, 235);
+                row.progressLabel.color = new Color(225, 225, 240, 255);
+                this._drawRoundRect(row.rowNode, rowW, rowH, new Color(18, 17, 62, 235), 14);
+                this._drawRoundRect(row.claimBtnNode, claimW, claimH, new Color(50, 69, 160, 255), 12);
+                this.taskHintedCompletions.delete(task.id);
             }
         }
         this._refreshTaskHUD();
@@ -826,6 +1031,390 @@ export class StackGame extends Component {
                     this.taskPanelNode = null;
                     this.taskPanelPointsLabel = null;
                     this.taskRows = [];
+                    this.taskHintedCompletions.clear();
+                }
+            })
+            .start();
+    }
+
+    private _handleSkinEntryClick(): void {
+        const now = Date.now();
+        if (now - this._lastSkinEntryClickAt < 180) {
+            return;
+        }
+        this._lastSkinEntryClickAt = now;
+        try {
+            this._toggleSkinPanel();
+        } catch (err) {
+            console.warn('[Skin] toggle panel failed', err);
+        }
+    }
+
+    private _toggleSkinPanel(): void {
+        if (this.skinPanelNode && this.skinPanelNode.isValid) {
+            this._hideSkinPanel();
+            return;
+        }
+        this._showSkinPanel();
+    }
+
+    private _showSkinPanel(): void {
+        if (!this._isAlive(this.uiCanvas)) return;
+        if (this.skinPanelNode && this.skinPanelNode.isValid) return;
+        this._hideTaskPanel();
+
+        let w = 750, h = 1334;
+        try {
+            const vs = view.getVisibleSize();
+            if (vs && vs.width > 0 && vs.height > 0) {
+                w = vs.width;
+                h = vs.height;
+            }
+        } catch {}
+
+        const root = new Node('SkinPanel');
+        root.layer = Layers.Enum.UI_2D;
+        root.addComponent(UITransform).setContentSize(w, h);
+        const mask = root.addComponent(UIOpacity);
+        mask.opacity = 0;
+        root.setPosition(0, 0, 0);
+        root.on(Input.EventType.TOUCH_START, (evt: any) => evt?.stopPropagation?.(), this);
+        root.on(Input.EventType.TOUCH_END, (evt: any) => evt?.stopPropagation?.(), this);
+
+        const board = new Node('Board');
+        board.layer = Layers.Enum.UI_2D;
+        const bw = Math.min(700, w * 0.9);
+        const bh = Math.min(1060, h * 0.82);
+        board.addComponent(UITransform).setContentSize(bw, bh);
+        board.setPosition(0, -10, 0);
+        this._drawRoundRect(board, bw, bh, new Color(17, 25, 71, 235), 18);
+        root.addChild(board);
+
+        const title = new Node('Title');
+        title.layer = Layers.Enum.UI_2D;
+        title.addComponent(UITransform).setContentSize(220, 56);
+        const tLab = title.addComponent(Label);
+        tLab.string = '皮肤';
+        tLab.fontSize = 48;
+        tLab.lineHeight = 52;
+        tLab.color = new Color(255, 255, 255, 255);
+        title.setPosition(0, bh * 0.44, 0);
+        board.addChild(title);
+
+        const points = new Node('Points');
+        points.layer = Layers.Enum.UI_2D;
+        points.addComponent(UITransform).setContentSize(240, 44);
+        const pLab = points.addComponent(Label);
+        pLab.string = '';
+        pLab.fontSize = 28;
+        pLab.lineHeight = 32;
+        pLab.color = new Color(255, 255, 255, 230);
+        points.setPosition(bw * 0.35, bh * 0.44, 0);
+        board.addChild(points);
+        this.skinPanelPointsLabel = pLab;
+
+        const owned = new Node('Owned');
+        owned.layer = Layers.Enum.UI_2D;
+        owned.addComponent(UITransform).setContentSize(260, 34);
+        const oLab = owned.addComponent(Label);
+        oLab.string = '';
+        oLab.fontSize = 22;
+        oLab.lineHeight = 26;
+        oLab.color = new Color(196, 215, 255, 230);
+        (oLab as any).horizontalAlign = 1;
+        owned.setPosition(0, bh * 0.39, 0);
+        board.addChild(owned);
+        this.skinPanelOwnedLabel = oLab;
+
+        const close = new Node('Close');
+        close.layer = Layers.Enum.UI_2D;
+        close.addComponent(UITransform).setContentSize(72, 52);
+        const cLab = close.addComponent(Label);
+        cLab.string = '←';
+        cLab.fontSize = 56;
+        cLab.lineHeight = 56;
+        cLab.color = new Color(255, 255, 255, 255);
+        close.setPosition(-bw * 0.42, bh * 0.44, 0);
+        close.on(Input.EventType.TOUCH_END, (evt: any) => {
+            evt?.stopPropagation?.();
+            this._hideSkinPanel();
+        }, this);
+        close.on(Input.EventType.MOUSE_UP, (evt: any) => {
+            evt?.stopPropagation?.();
+            this._hideSkinPanel();
+        }, this);
+        board.addChild(close);
+
+        this.skinTabNodes.clear();
+        const tabs: Array<{ rarity: SkinRarity; label: string }> = [
+            { rarity: 'basic', label: '普通' },
+            { rarity: 'rare', label: '稀有' },
+            { rarity: 'epic', label: '史诗' },
+            { rarity: 'special', label: 'Special' },
+        ];
+        const tabY = bh * 0.33;
+        const tabW = bw * 0.22;
+        for (let i = 0; i < tabs.length; i += 1) {
+            const tab = new Node(`SkinTab_${tabs[i].rarity}`);
+            tab.layer = Layers.Enum.UI_2D;
+            tab.addComponent(UITransform).setContentSize(tabW, 74);
+            tab.setPosition(-bw * 0.33 + i * (tabW + 10), tabY, 0);
+            this._drawRoundRect(tab, tabW, 74, new Color(53, 77, 160, 255), 12);
+            const tabText = new Node('Text');
+            tabText.layer = Layers.Enum.UI_2D;
+            tabText.addComponent(UITransform).setContentSize(tabW - 10, 40);
+            const tabLab = tabText.addComponent(Label);
+            tabLab.string = tabs[i].label;
+            tabLab.fontSize = 28;
+            tabLab.lineHeight = 32;
+            tabLab.color = new Color(255, 255, 255, 255);
+            (tabLab as any).horizontalAlign = 1;
+            tab.addChild(tabText);
+            tab.on(Input.EventType.TOUCH_END, (evt: any) => {
+                evt?.stopPropagation?.();
+                this.selectedSkinRarity = tabs[i].rarity;
+                this._refreshSkinPanel();
+            }, this);
+            tab.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                evt?.stopPropagation?.();
+                this.selectedSkinRarity = tabs[i].rarity;
+                this._refreshSkinPanel();
+            }, this);
+            board.addChild(tab);
+            this.skinTabNodes.set(tabs[i].rarity, tab);
+        }
+
+        this.skinCards = [];
+        const cards = this.skinManager.getSkins(this.selectedSkinRarity);
+        const count = Math.max(1, cards.length);
+        const areaTop = bh * 0.16;
+        const areaBottom = -bh * 0.33;
+        const rowH = Math.max(194, Math.min(224, (areaTop - areaBottom) / count));
+        const cardW = bw * 0.88;
+        const cardH = Math.max(172, Math.min(196, rowH - 16));
+        const startY = areaTop - rowH * 0.5;
+        for (let i = 0; i < cards.length; i += 1) {
+            const skin = cards[i];
+            const card = new Node(`SkinCard_${skin.id}`);
+            card.layer = Layers.Enum.UI_2D;
+            card.addComponent(UITransform).setContentSize(cardW, cardH);
+            card.setPosition(0, startY - i * rowH, 0);
+            this._drawRoundRect(card, cardW, cardH, new Color(12, 18, 53, 245), 18);
+            board.addChild(card);
+
+            const nameNode = new Node('Name');
+            nameNode.layer = Layers.Enum.UI_2D;
+            nameNode.addComponent(UITransform).setContentSize(240, 38);
+            nameNode.setPosition(-cardW * 0.28, cardH * 0.29, 0);
+            const nameLab = nameNode.addComponent(Label);
+            nameLab.string = skin.name;
+            nameLab.fontSize = 32;
+            nameLab.lineHeight = 36;
+            nameLab.color = new Color(255, 255, 255, 255);
+            card.addChild(nameNode);
+
+            const statusNode = new Node('Status');
+            statusNode.layer = Layers.Enum.UI_2D;
+            statusNode.addComponent(UITransform).setContentSize(220, 30);
+            statusNode.setPosition(-cardW * 0.28, cardH * 0.08, 0);
+            const statusLab = statusNode.addComponent(Label);
+            statusLab.string = '';
+            statusLab.fontSize = 22;
+            statusLab.lineHeight = 26;
+            statusLab.color = new Color(177, 210, 255, 255);
+            card.addChild(statusNode);
+
+            const previewNodes: Node[] = [];
+            for (let j = 0; j < 4; j += 1) {
+                const swatch = new Node(`Preview_${j}`);
+                swatch.layer = Layers.Enum.UI_2D;
+                swatch.addComponent(UITransform).setContentSize(64, 64);
+                swatch.setPosition(-cardW * 0.30 + j * 70, -cardH * 0.22, 0);
+                this._drawRoundRect(swatch, 64, 64, new Color(255, 255, 255, 255), 10);
+                card.addChild(swatch);
+                previewNodes.push(swatch);
+            }
+
+            const priceNode = new Node('Price');
+            priceNode.layer = Layers.Enum.UI_2D;
+            priceNode.addComponent(UITransform).setContentSize(190, 30);
+            priceNode.setPosition(cardW * 0.26, cardH * 0.14, 0);
+            const priceLab = priceNode.addComponent(Label);
+            priceLab.string = '';
+            priceLab.fontSize = 24;
+            priceLab.lineHeight = 28;
+            priceLab.color = new Color(255, 240, 190, 255);
+            (priceLab as any).horizontalAlign = 1;
+            card.addChild(priceNode);
+
+            const actionBtn = new Node('ActionBtn');
+            actionBtn.layer = Layers.Enum.UI_2D;
+            actionBtn.addComponent(UITransform).setContentSize(170, 78);
+            actionBtn.setPosition(cardW * 0.26, -cardH * 0.20, 0);
+            this._drawRoundRect(actionBtn, 170, 78, new Color(243, 164, 41, 255), 14);
+            const actionText = new Node('ActionText');
+            actionText.layer = Layers.Enum.UI_2D;
+            actionText.addComponent(UITransform).setContentSize(160, 40);
+            const actionLab = actionText.addComponent(Label);
+            actionLab.string = '';
+            actionLab.fontSize = 26;
+            actionLab.lineHeight = 30;
+            actionLab.color = new Color(255, 255, 255, 255);
+            (actionLab as any).horizontalAlign = 1;
+            actionBtn.addChild(actionText);
+            actionBtn.on(Input.EventType.TOUCH_END, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleSkinAction(skin.id);
+            }, this);
+            actionBtn.on(Input.EventType.MOUSE_UP, (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleSkinAction(skin.id);
+            }, this);
+            card.addChild(actionBtn);
+
+            this.skinCards.push({
+                skinId: skin.id,
+                cardNode: card,
+                actionNode: actionBtn,
+                nameLabel: nameLab,
+                priceLabel: priceLab,
+                actionLabel: actionLab,
+                statusLabel: statusLab,
+                previewNodes,
+            });
+        }
+
+        this.uiCanvas.addChild(root);
+        this.skinPanelNode = root;
+        this._refreshSkinPanel();
+        this._refreshTaskHUD();
+        tween(mask).to(0.15, { opacity: 255 }, { easing: 'quadOut' }).start();
+    }
+
+    private _refreshSkinPanel(): void {
+        if (!this.skinPanelNode || !this.skinPanelNode.isValid) return;
+
+        const rarityColors: Record<SkinRarity, Color> = {
+            basic: new Color(90, 111, 190, 255),
+            rare: new Color(75, 153, 125, 255),
+            epic: new Color(139, 84, 194, 255),
+            special: new Color(218, 135, 45, 255),
+        };
+
+        for (const [rarity, tab] of this.skinTabNodes.entries()) {
+            this._drawRoundRect(
+                tab,
+                tab.getComponent(UITransform)?.contentSize.width ?? 140,
+                tab.getComponent(UITransform)?.contentSize.height ?? 74,
+                rarity === this.selectedSkinRarity ? rarityColors[rarity] : new Color(53, 77, 160, 255),
+                12
+            );
+        }
+
+        const skins = this.skinManager.getSkins(this.selectedSkinRarity);
+        const ownedCount = skins.filter((s) => s.owned).length;
+        if (this.skinPanelOwnedLabel && this.skinPanelOwnedLabel.isValid) {
+            this.skinPanelOwnedLabel.string = `已拥有 ${ownedCount}/${skins.length}`;
+        }
+        const byId = new Map(skins.map((skin) => [skin.id, skin]));
+        for (const card of this.skinCards) {
+            const skin = byId.get(card.skinId);
+            if (!skin) continue;
+
+            card.nameLabel.string = skin.name;
+            card.priceLabel.string = skin.price <= 0 ? '免费' : `${skin.price} ◆`;
+            if (skin.equipped) {
+                card.statusLabel.string = '已装备';
+                card.statusLabel.color = new Color(118, 232, 182, 255);
+                card.actionLabel.string = '使用中';
+                card.actionLabel.color = new Color(255, 255, 255, 255);
+            } else if (skin.owned) {
+                card.statusLabel.string = '已拥有';
+                card.statusLabel.color = new Color(170, 220, 255, 255);
+                card.actionLabel.string = '装备';
+                card.actionLabel.color = new Color(255, 255, 255, 255);
+            } else {
+                card.statusLabel.string = skin.rarity === 'special' ? '限定风格' : '未拥有';
+                card.statusLabel.color = new Color(196, 198, 232, 245);
+                card.actionLabel.string = this.taskPoints >= skin.price ? '购买' : '不足';
+                card.actionLabel.color = this.taskPoints >= skin.price
+                    ? new Color(255, 255, 255, 255)
+                    : new Color(230, 230, 240, 230);
+            }
+
+            const cardUI = card.cardNode.getComponent(UITransform);
+            const cardBg = skin.equipped
+                ? new Color(24, 52, 95, 248)
+                : skin.owned
+                    ? new Color(18, 35, 76, 246)
+                    : new Color(12, 18, 53, 245);
+            this._drawRoundRect(
+                card.cardNode,
+                cardUI?.contentSize.width ?? 560,
+                cardUI?.contentSize.height ?? 190,
+                cardBg,
+                18
+            );
+
+            const actionColor = skin.equipped
+                ? new Color(62, 117, 203, 255)
+                : skin.owned
+                    ? new Color(56, 148, 104, 255)
+                    : (this.taskPoints >= skin.price ? new Color(243, 164, 41, 255) : new Color(112, 112, 134, 255));
+            const ui = card.actionNode.getComponent(UITransform);
+            this._drawRoundRect(card.actionNode, ui?.contentSize.width ?? 170, ui?.contentSize.height ?? 78, actionColor, 14);
+
+            const previewLevels = [0, 4, 9, 16];
+            for (let i = 0; i < card.previewNodes.length; i += 1) {
+                const node = card.previewNodes[i];
+                const c = this._getSkinColorByLevel(skin, previewLevels[i] ?? 0);
+                this._drawRoundRect(node, 64, 64, c, 10);
+            }
+        }
+
+        this._refreshTaskHUD();
+    }
+
+    private _handleSkinAction(skinId: string): void {
+        const skin = this.skinManager.getSkinById(skinId);
+        if (!skin) return;
+
+        if (this.skinManager.isOwned(skinId)) {
+            if (this.skinManager.equip(skinId)) {
+                this._applyEquippedSkinToScene();
+                this._refreshSkinPanel();
+            }
+            return;
+        }
+
+        const purchase = this.skinManager.purchase(skinId, this.taskPoints);
+        if (!purchase.ok) {
+            this._refreshSkinPanel();
+            return;
+        }
+        this._spendTaskPoints(skin.price);
+
+        this._applyEquippedSkinToScene();
+        this._refreshSkinPanel();
+    }
+
+    private _hideSkinPanel(): void {
+        if (!this.skinPanelNode || !this.skinPanelNode.isValid) return;
+        const target = this.skinPanelNode;
+        const op = target.getComponent(UIOpacity) || target.addComponent(UIOpacity);
+        tween(op)
+            .to(0.12, { opacity: 0 }, { easing: 'quadIn' })
+            .call(() => {
+                if (target && target.isValid) {
+                    target.removeFromParent();
+                    target.destroy();
+                }
+                if (this.skinPanelNode === target) {
+                    this.skinPanelNode = null;
+                    this.skinPanelPointsLabel = null;
+                    this.skinPanelOwnedLabel = null;
+                    this.skinCards = [];
+                    this.skinTabNodes.clear();
                 }
             })
             .start();
@@ -864,7 +1453,7 @@ export class StackGame extends Component {
         const FIX_RIGHT_MARGIN = Math.max(36, Math.min(80, w * 0.06)); // 约 45px@750, 65px@1080
         const FIX_TOP_MARGIN   = Math.max(70, Math.min(140, h * 0.103)); // 约 107px@1334, 187px@2340
         const MAIN_SCORE_X_OFFSET = -12; // 仅主分数水平偏移：负数向左，正数向右
-        const TASK_ENTRY_RIGHT_MARGIN = 80; // 任务图标距屏幕右侧：值越小越靠右
+        const TASK_ENTRY_RIGHT_MARGIN = 22; // 任务图标距屏幕右侧：值越小越靠右
 
         // 右上角：主分数（锚点在右上），固定边距
         let mainScoreFontSize = Math.round(36 * scale);
@@ -928,13 +1517,37 @@ export class StackGame extends Component {
         // 右侧中部：任务入口图标（同心圆）
         if (this.taskEntryButtonNode && this.taskEntryButtonNode.isValid) {
             const ui = this.taskEntryButtonNode.getComponent(UITransform) || this.taskEntryButtonNode.addComponent(UITransform);
-            ui.setAnchorPoint(1, 0.5);
-            this.taskEntryButtonNode.setPosition(w * 0.5 - TASK_ENTRY_RIGHT_MARGIN, 0, 0);
-            ui.setContentSize(Math.round(120 * scale), Math.round(120 * scale));
+            ui.setAnchorPoint(0.5, 0.5);
+            ui.setContentSize(Math.round(94 * scale), Math.round(94 * scale));
+            this.taskEntryButtonNode.setPosition(
+                w * 0.5 - TASK_ENTRY_RIGHT_MARGIN - ui.contentSize.width * 0.5,
+                0,
+                0
+            );
             const iconNode = this.taskEntryButtonNode.getChildByName('TaskEntryIcon');
             if (iconNode && iconNode.isValid) {
                 const iconUI = iconNode.getComponent(UITransform) || iconNode.addComponent(UITransform);
                 iconUI.setContentSize(Math.round(88 * scale), Math.round(88 * scale));
+            }
+        }
+
+        if (this.skinEntryButtonNode && this.skinEntryButtonNode.isValid) {
+            const ui = this.skinEntryButtonNode.getComponent(UITransform) || this.skinEntryButtonNode.addComponent(UITransform);
+            ui.setAnchorPoint(0.5, 0.5);
+            ui.setContentSize(Math.round(112 * scale), Math.round(120 * scale));
+            const SKIN_ENTRY_LEFT_MARGIN = 18;
+            const SKIN_ENTRY_Y_OFFSET = -24;
+            const SKIN_ENTRY_FINE_LEFT_SHIFT = 10;
+            this.skinEntryButtonNode.setPosition(
+                -w * 0.5 + SKIN_ENTRY_LEFT_MARGIN + ui.contentSize.width * 0.5 - SKIN_ENTRY_FINE_LEFT_SHIFT,
+                SKIN_ENTRY_Y_OFFSET,
+                0
+            );
+            const iconNode = this.skinEntryButtonNode.getChildByName('SkinEntryIcon');
+            if (iconNode && iconNode.isValid) {
+                const iconUI = iconNode.getComponent(UITransform) || iconNode.addComponent(UITransform);
+                iconUI.setContentSize(Math.round(110 * scale), Math.round(110 * scale));
+                iconNode.setPosition(0, Math.round(10 * scale), 0);
             }
         }
     }
@@ -1189,6 +1802,8 @@ export class StackGame extends Component {
     private _beginGameFromStartOverlay(): void {
         if (!this.isWaitingStart) return;
         this.isWaitingStart = false;
+        this._hideTaskPanel();
+        this._hideSkinPanel();
         this._hideStartOverlay();
         this._hideGameOverOverlay();
         this.spawnNextBlock();
@@ -1393,27 +2008,27 @@ export class StackGame extends Component {
         this._cameraShake(0.03, 0.12);
     }
 
-    getBlockColorByLevel(level: number): Color {
-        // 1) 仍然使用“递增色相”
-        const hue = (this.baseHueOffset + level * this.hueStep) % 360;
+    private _getEffectiveSkin(): SkinConfig {
+        return this.skinManager.getEquippedSkin();
+    }
 
-        // 2) 好看曲线（smoothstep + 正弦）——让 S/L 随 hue 平滑摆动
+    private _getSkinColorByLevel(skin: SkinConfig, level: number): Color {
+        const profile = skin.profile;
+        const hue = (this.baseHueOffset + profile.hue_start + level * profile.hue_step) % 360;
+
         const hRad = hue * Math.PI / 180;
         const smooth = (x: number) => x * x * (3 - 2 * x);
-        const t = smooth((Math.sin(hRad * 0.7 + 0.6) * 0.5 + 0.5)); // 0..1
+        const t = smooth((Math.sin(hRad * 0.7 + 0.6) * 0.5 + 0.5));
 
-        let s = this.satBase + this.satVar * (t * 2 - 1);              // satBase ± satVar
-        let l = this.lightBase + this.lightVar * (Math.sin(hRad + 1));  // lightBase ± lightVar
+        let s = profile.sat_base + profile.sat_var * (t * 2 - 1);
+        let l = profile.light_base + profile.light_var * Math.sin(hRad + 1);
 
-        // 3) 颜色卫生修正：对“易脏”区段做温和微调（不破坏递增风格）
-        if (hue >= 90 && hue < 150) { s *= 0.92; l += 0.03; }   // 绿色：降饱和、提亮一点
-        if (hue >= 210 && hue < 260) { l += 0.04; }             // 靛青：提亮避免发闷
-        if (hue >= 340 || hue < 20)   { s = Math.min(s, 0.60); } // 纯红品红：限制饱和避免刺眼
+        if (hue >= 90 && hue < 150) { s *= 0.92; l += 0.03; }
+        if (hue >= 210 && hue < 260) { l += 0.04; }
+        if (hue >= 340 || hue < 20) { s = Math.min(s, 0.60); }
 
-        // 4) 随层整体轻微变亮（让后期更通透）
-        l += this.levelBrighten * Math.min(level, 80); // 上限避免过度
+        l += profile.level_brighten * Math.min(level, 80);
 
-        // 5) HSL → RGB（内联，无外部依赖）
         s = Math.max(0, Math.min(1, s));
         l = Math.max(0, Math.min(1, l));
         const c = (1 - Math.abs(2 * l - 1)) * s;
@@ -1428,6 +2043,29 @@ export class StackGame extends Component {
         else               { r = c; g = 0; b = x; }
 
         return new Color((r + m) * 255, (g + m) * 255, (b + m) * 255, 255);
+    }
+
+    getBlockColorByLevel(level: number): Color {
+        return this._getSkinColorByLevel(this._getEffectiveSkin(), level);
+    }
+
+    private _applyEquippedSkinToScene(): void {
+        const baseColor = this.getBlockColorByLevel(0);
+        if (this.baseBlock && this.baseBlock.isValid) {
+            const mr = this.baseBlock.getComponent(MeshRenderer);
+            const mat = mr?.getMaterialInstance(0);
+            if (mat) {
+                this._setMatColor(mat, baseColor);
+            }
+        }
+        if (this.movingBlock && this.movingBlock.isValid) {
+            const mr = this.movingBlock.getComponent(MeshRenderer);
+            const mat = mr?.getMaterialInstance(0);
+            if (mat) {
+                this._setMatColor(mat, this.getBlockColorByLevel(this.score + 1));
+            }
+        }
+        this._setBackgroundToBaseColor(baseColor);
     }
 
 
@@ -1584,10 +2222,11 @@ export class StackGame extends Component {
 
     private _adjustForBackground(src: Color): Color {
         const { h, s, l } = this._colorToHsl(src);
+        const profile = this._getEffectiveSkin().profile;
         // 同色系轻雾化：保留色相，明显降饱和+提明度（雾面玻璃感）
         const h2 = h;
-        let s2 = s * 0.22;
-        let l2 = l + 0.20 * (1 - l);
+        let s2 = s * (profile.background_sat_scale ?? 0.22);
+        let l2 = l + (profile.background_light_boost ?? 0.20) * (1 - l);
 
         // 细微压制暖区饱和，避免泛黄
         if (h2 >= 330 || h2 < 40) {
@@ -1675,6 +2314,12 @@ export class StackGame extends Component {
             this._reportTask('login', 1);
         } catch (err) {
             console.warn('[Task] init failed, continue without task progress updates in this session.', err);
+        }
+        try {
+            const configs = _resolveSkinConfigs(skinConfigs);
+            this.skinManager.init(configs);
+        } catch (err) {
+            console.warn('[Skin] init failed, continue with classic skin in this session.', err);
         }
 
         // 复活状态初始化
@@ -1778,8 +2423,10 @@ export class StackGame extends Component {
             this._reviveOverlayNode,
             this.comboBadgeNode,
             this.taskEntryButtonNode,
+            this.skinEntryButtonNode,
             this.taskPointsNode,
             this.taskPanelNode,
+            this.skinPanelNode,
         ];
         toStop.forEach(n => { if (n && n.isValid) Tween.stopAllByTarget(n); });
     }
@@ -1797,7 +2444,9 @@ export class StackGame extends Component {
             this.gameOverOverlayNode,
             this._reviveOverlayNode,
             this.taskPanelNode,
+            this.skinPanelNode,
             this.taskEntryButtonNode,
+            this.skinEntryButtonNode,
             this.taskPointsNode,
         ];
         toDispose.forEach(n => {
@@ -1810,11 +2459,17 @@ export class StackGame extends Component {
         this.gameOverOverlayNode = null;
         this._reviveOverlayNode = null;
         this.taskPanelNode = null;
+        this.skinPanelNode = null;
         this.taskEntryButtonNode = null;
+        this.skinEntryButtonNode = null;
         this.taskPointsNode = null;
         this.taskPointsLabel = null;
         this.taskPointsDiamondIconLabel = null;
+        this.skinPanelPointsLabel = null;
+        this.skinPanelOwnedLabel = null;
         this.taskRows = [];
+        this.skinCards = [];
+        this.skinTabNodes.clear();
         this._leaderboardViews = [];
     }
 
@@ -2659,12 +3314,13 @@ export class StackGame extends Component {
             excessSize = precision(currentSize - retainedSize);
 
         if (retainedSize > 0) {
-            if (excessSize === 0) {
+                if (excessSize === 0) {
                     // 完美堆叠
                     wasPerfect = true;
-                    this._reportTask('perfect_stack', 1);
                     this.playPerfectStackWithCombo();
                     this.comboCount += 1; // 连击 +1（放到播放之后，使第一次完美播放基础音效）
+                    // 连续完美任务：记录本局连续完美最高值
+                    this._reportTask('perfect_stack', Math.floor(this.comboCount), 'set-max');
                     this.showPerfectEffect(this.movingBlock.position); // 显示完美堆叠特效
                     this._updateComboBadge();
                     // 完美不在此处直接改速度；改为稍后统一计算增量并限幅（见“合并加速”段）
@@ -2796,7 +3452,8 @@ export class StackGame extends Component {
             this.baseBlock = this.movingBlock;
 
             this.score += 1;
-            this._reportTask('reach_layers', 1);
+            // 单局层数任务：记录本局最高层数，而不是跨局累加
+            this._reportTask('reach_layers', Math.floor(this.score), 'set-max');
 
             // 计分：主显示总分（含完美/连击奖励），副显示层数
             this._addPointsForPlacement(wasPerfect);

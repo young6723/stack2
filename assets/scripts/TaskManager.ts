@@ -42,7 +42,7 @@ export type ClaimResult = {
     reward?: TaskReward;
 };
 
-const DAILY_TASKS_STATE_KEY = 'daily_tasks_state_v1';
+const DAILY_TASKS_STATE_KEY = 'daily_tasks_state_v3';
 
 export class TaskManager {
     private static _instance: TaskManager | null = null;
