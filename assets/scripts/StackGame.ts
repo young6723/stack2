@@ -3,9 +3,9 @@ import { _decorator, Component, Node, input, Input, Vec3, instantiate, Prefab, t
 import { FriendRankView } from './FriendRankView';
 import { DailyTaskConfig, TaskManager } from './TaskManager';
 import { SkinConfig, SkinManager, SkinRarity } from './SkinManager';
+import { WxGamePlatform } from './WxGamePlatform';
 import * as dailyTaskConfigs from '../config/daily_tasks.json';
 import * as skinConfigs from '../config/skins.json';
-declare const wx: any;
 type LeaderboardRowRefs = {
     rankLabel: Label;
     pointsLabel: Label;
@@ -187,7 +187,6 @@ export class StackGame extends Component {
     @property
     reviveMinScaleRatio: number = 0.65;         // 复活时底块的最小 X/Z 比例（相对于初始底座尺寸），太薄则回填到该比例
     private _reviveOverlayNode: Node = null;    // 复活弹窗节点
-    private _rewardedAd: any = null;            // 微信激励视频实例
     private _reviveRequesting: boolean = false; // 正在请求广告
     private _reviveCount: number = 0;           // 已使用复活次数
     private _gameOverFinalized: boolean = false; // 防止重复结算
@@ -196,6 +195,7 @@ export class StackGame extends Component {
     private baseBlock: Node = null;
     private bgmSource: AudioSource = null;
     private _bgmStarted: boolean = false; // 解决浏览器自动播放限制：必须在用户交互后再启动 BGM
+    private readonly _wxPlatform = WxGamePlatform.getInstance();
 
     // 在首次用户交互（触摸/鼠标/键盘）后再启动 BGM，避免浏览器拦截
     private _bindUserGestureForBGM() {
@@ -2385,18 +2385,19 @@ export class StackGame extends Component {
 
         // 微信小游戏前后台切换：暂停/恢复 BGM 与游戏逻辑
         if (sys.platform === sys.Platform.WECHAT_GAME) {
-            const wxAny: any = (window as any).wx;
-            wxAny?.onHide?.(() => {
-                if (!this.isValid) return;
-                this.bgmSource?.pause();
-                director.pause();
-            });
-            wxAny?.onShow?.(() => {
-                if (!this.isValid) return;
-                director.resume();
-                if (this._bgmStarted && this.bgmSource?.isValid) {
-                    this.bgmSource.play();
-                }
+            this._wxPlatform.registerLifecycle({
+                onHide: () => {
+                    if (!this.isValid) return;
+                    this.bgmSource?.pause();
+                    director.pause();
+                },
+                onShow: () => {
+                    if (!this.isValid) return;
+                    director.resume();
+                    if (this._bgmStarted && this.bgmSource?.isValid) {
+                        this.bgmSource.play();
+                    }
+                },
             });
             this._initWechatShare();
             this._ensureRewardedAd();
@@ -2435,10 +2436,14 @@ export class StackGame extends Component {
         input.off(Input.EventType.KEY_DOWN, this._onKeyDown, this);
         input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
         try { if (typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('resize', this._onWindowResize); } catch {}
+        this._wxPlatform.unregisterLifecycle();
+        this._wxPlatform.unregisterShare();
+        this._wxPlatform.disposeRewardedAd();
         if (this.bgmSource && this.bgmSource.isValid) {
             this.bgmSource.stop();
         }
         this.onDisable();
+        FriendRankView.disposeRuntime();
         const toDispose = [
             this.startOverlayNode,
             this.gameOverOverlayNode,
@@ -2534,31 +2539,10 @@ export class StackGame extends Component {
 
     // 将成绩写入微信关系链存储，供开放数据域好友榜读取；非微信环境直接跳过
     private _syncWxFriendStorage(): void {
-        if (typeof wx === 'undefined') return;
-        const pts = Math.max(0, Math.floor(this.points));
-        const layers = Math.max(0, Math.floor(this.score));
-        try {
-            wx.setUserCloudStorage({
-                KVDataList: [
-                    { key: 'points', value: String(pts) },
-                    { key: 'layers', value: String(layers) },
-                ],
-                success: () => {
-                    if (this.debugLogScores) {
-                        console.log('[StackGame] setUserCloudStorage ok', pts, layers);
-                    }
-                },
-                fail: (err: any) => {
-                    if (this.debugLogScores) {
-                        console.warn('[StackGame] setUserCloudStorage failed', err);
-                    }
-                },
-            });
-        } catch (err) {
-            if (this.debugLogScores) {
-                console.warn('[StackGame] setUserCloudStorage threw', err);
-            }
-        }
+        this._wxPlatform.setUserCloudStorage({
+            points: this.points,
+            layers: this.score,
+        }, this.debugLogScores);
     }
 
     private _appendLocalLeaderboard(points: number, layers: number): void {
@@ -2591,27 +2575,10 @@ export class StackGame extends Component {
 
     private async _ensureUserProfile(): Promise<{ nickName: string; avatarUrl: string } | null> {
         if (this._profileCache) return this._profileCache;
-        const wxAny: any =
-          (typeof window !== 'undefined' ? (window as any).wx : undefined) ||
-          (typeof wx !== 'undefined' ? wx : undefined);
-        if (!wxAny?.getUserProfile) return null;
-        try {
-            const profile = await new Promise<{ nickName: string; avatarUrl: string }>((resolve, reject) => {
-                wxAny.getUserProfile({
-                    desc: '用于展示排行榜',
-                    success: (res: any) => resolve({
-                        nickName: res?.userInfo?.nickName ?? '',
-                        avatarUrl: res?.userInfo?.avatarUrl ?? '',
-                    }),
-                    fail: reject,
-                });
-            });
-            this._profileCache = profile;
-            return profile;
-        } catch (err) {
-            console.warn('[StackGame] getUserProfile failed', err);
-            return null;
-        }
+        const profile = await this._wxPlatform.getUserProfile('用于展示排行榜');
+        if (!profile) return null;
+        this._profileCache = profile;
+        return profile;
     }
 
     private _injectLeaderboard(root: Node, startY: number = -220, scale: number = 1): void {
@@ -2707,51 +2674,22 @@ export class StackGame extends Component {
         this._updateLeaderboardRows(rows, this._readLeaderboard());
     }
 
-    // —— 复活 & 激励视频 —— 
-    private _getWx(): any {
-        if (typeof wx !== 'undefined') return wx as any;
-        if (typeof window !== 'undefined') return (window as any).wx;
-        return undefined;
-    }
-
     private _initWechatShare(): void {
-        if (sys.platform !== sys.Platform.WECHAT_GAME) return;
-        const wxAny = this._getWx();
-        if (!wxAny?.showShareMenu) return;
-        try {
-            // 打开转发和朋友圈入口。复制链接能力当前由平台控制，小游戏只能使用官方菜单。
-            wxAny.showShareMenu({
-                withShareTicket: true,
-                menus: ['shareAppMessage', 'shareTimeline']
-            });
-            const payload = () => ({
+        this._wxPlatform.registerShare(() => ({
                 title: this.shareTitle || '方块堆堆高',
                 imageUrl: this.shareImageUrl || undefined,
-                query: this.shareQuery || ''
-            });
-            wxAny.onShareAppMessage?.(() => payload());
-            wxAny.onShareTimeline?.(() => payload());
-        } catch (err) {
-            console.warn('[Share] init share failed', err);
-        }
+                query: this.shareQuery || '',
+            }),
+        );
     }
 
     private _ensureRewardedAd(): void {
         if (!this.enableReviveAd) return;
-        if (this._rewardedAd) return;
         if (!this.reviveAdUnitId) return;
         if (sys.platform !== sys.Platform.WECHAT_GAME) return;
-        const wxAny = this._getWx();
-        if (!wxAny?.createRewardedVideoAd) return;
-        try {
-            const ad = wxAny.createRewardedVideoAd({ adUnitId: this.reviveAdUnitId });
-            ad.onError?.((err: any) => {
-                console.warn('[ReviveAd] create/load error', err);
-            });
-            this._rewardedAd = ad;
-        } catch (err) {
-            console.warn('[ReviveAd] createRewardedVideoAd failed', err);
-        }
+        this._wxPlatform.ensureRewardedAd(this.reviveAdUnitId, (err: any) => {
+            console.warn('[ReviveAd] create/load error', err);
+        });
     }
 
     private _canOfferRevive(): boolean {
@@ -2760,46 +2698,15 @@ export class StackGame extends Component {
         if (this._gameOverFinalized) return false;
         if (sys.platform === sys.Platform.WECHAT_GAME) {
             this._ensureRewardedAd();
-            return !!(this.reviveAdUnitId && this._rewardedAd);
+            return this._wxPlatform.hasRewardedAd(this.reviveAdUnitId);
         }
         return this.mockReviveInEditor; // 非微信环境：仅用于编辑器/浏览器调试
     }
 
     private _showRewardedVideoAd(): Promise<boolean> {
-        // 编辑器/浏览器环境：直接模拟成功，方便联调
-        if (sys.platform !== sys.Platform.WECHAT_GAME) {
-            return new Promise((resolve) => {
-                this.scheduleOnce(() => {
-                    if (!this.isValid) { resolve(false); return; }
-                    resolve(true);
-                }, 0.3);
-            });
-        }
-        return new Promise((resolve) => {
-            const ad = this._rewardedAd;
-            if (!ad) {
-                resolve(false);
-                return;
-            }
-            const cleanup = () => {
-                ad.offClose?.(onClose);
-                ad.offError?.(onError);
-            };
-            const onClose = (res: any) => {
-                cleanup();
-                const completed = res?.isEnded !== false;
-                resolve(completed);
-            };
-            const onError = (err: any) => {
-                console.warn('[ReviveAd] show error', err);
-                cleanup();
-                resolve(false);
-            };
-            ad.onClose?.(onClose);
-            ad.onError?.(onError);
-            ad.show?.().catch(() => {
-                ad.load?.().then(() => ad.show?.().catch(onError)).catch(onError);
-            });
+        return this._wxPlatform.showRewardedVideoAd({
+            mockInEditor: this.mockReviveInEditor,
+            mockDelayMs: 300,
         });
     }
 

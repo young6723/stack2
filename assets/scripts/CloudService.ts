@@ -1,5 +1,8 @@
 declare const wx: any;
 
+// Optional global leaderboard service.
+// The live gameplay flow currently uses WeChat friend ranking via ODC + user cloud storage.
+
 export type CloudLeaderboardEntry = {
     points: number;
     layers: number;
@@ -59,4 +62,3 @@ export async function fetchLeaderboardFromCloud(limit: number = 10): Promise<Clo
         return [];
     }
 }
-

@@ -6,7 +6,7 @@
       "outputName": "wechatgame",
       "mainBundleCompressionType": "merge_dep",
       "platform": "wechatgame",
-      "mainBundleIsRemote": true,
+      "mainBundleIsRemote": false,
       "md5Cache": true,
       "server": "https://yfgame.cloud",
       "scenes": [
@@ -1570,6 +1570,14 @@
         "__version__": "1.0.4"
       },
       "1772446653534": {
+        "orientation": "portrait",
+        "appid": "wxc6d66add66adce28",
+        "buildOpenDataContextTemplate": true,
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1773567511132": {
         "orientation": "portrait",
         "appid": "wxc6d66add66adce28",
         "buildOpenDataContextTemplate": true,

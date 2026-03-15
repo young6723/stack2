@@ -1,17 +1,22 @@
 import { _decorator, Component, Node, UITransform, Layers, director, Label, BlockInputEvents, SubContextView, Size, view, Color, Graphics, UIOpacity, Input, sys, Vec2, screen, Canvas, Vec3 } from 'cc';
+import { WxGamePlatform } from './WxGamePlatform';
 const { ccclass, property } = _decorator;
-
-declare const wx: any;
 
 @ccclass('FriendRankView')
 export class FriendRankView extends Component {
     private static _instance: FriendRankView | null = null;
     private static _backdropNode: Node | null = null;
     private static _buttonNode: Node | null = null;
+    private static _closeNode: Node | null = null;
     private static _buttonResizeBound: boolean = false;
     // —— Backdrop event handlers (must be stable references for off/on) —— 
     private static _onBackdropSwallow: ((e: any) => void) | null = null;
     private static _onBackdropClose: ((e: any) => void) | null = null;
+    private static _onButtonTouchStart: ((e: any) => void) | null = null;
+    private static _onButtonMouseDown: ((e: any) => void) | null = null;
+    private static _onButtonTouchEnd: ((e: any) => void) | null = null;
+    private static _onButtonMouseUp: ((e: any) => void) | null = null;
+    private static _onDesignResolutionChanged: (() => void) | null = null;
     private static _backdropColorLocked: boolean = false; // 由运行时动态颜色锁定，避免 onLoad 覆盖
 
     private static readonly _btnMarginXBase = 36;
@@ -108,16 +113,18 @@ export class FriendRankView extends Component {
         host.addChild(close);
         close.setSiblingIndex(host.children.length - 1);
         this._closeNode = close;
+        FriendRankView._closeNode = close;
         // 刚 show 出来时，避免同一次点击/抬手误点到关闭按钮导致“闪一下就没了”
         this._armClose(0.15);
     }
 
     onDestroy() {
         if (FriendRankView._instance === this) {
-            FriendRankView._instance = null;
+            FriendRankView.disposeRuntime();
+            return;
         }
-        if (FriendRankView._backdropNode && FriendRankView._backdropNode.isValid) {
-            FriendRankView._backdropNode.active = false;
+        if (this._armCloseCb) {
+            try { this.unschedule(this._armCloseCb); } catch {}
         }
         if (this._closeNode && this._closeNode.isValid) {
             try {
@@ -328,11 +335,11 @@ export class FriendRankView extends Component {
             }
         }
 
-        if (typeof wx !== 'undefined') {
-            const ctx = wx.getOpenDataContext?.();
-            // 仅通知子域重绘/显示；sharedCanvas 尺寸由 SubContextView 控制
-            ctx?.postMessage?.({ type: 'SHOW_FRIEND_RANK', width: clamped.w, height: clamped.h });
-        }
+        WxGamePlatform.getInstance().postOpenDataMessage({
+            type: 'SHOW_FRIEND_RANK',
+            width: clamped.w,
+            height: clamped.h,
+        });
     }
 
     public static hide() {
@@ -346,12 +353,9 @@ export class FriendRankView extends Component {
             this._backdropNode.active = false;
         }
         // 隐藏关闭按钮
-        const close = (this._instance as any)?._closeNode as Node | null;
+        const close = this._closeNode ?? ((this._instance as any)?._closeNode as Node | null);
         if (close && close.isValid) close.active = false;
-        if (typeof wx !== 'undefined') {
-            const ctx = wx.getOpenDataContext?.();
-            ctx?.postMessage?.({ type: 'HIDE_FRIEND_RANK' });
-        }
+        WxGamePlatform.getInstance().postOpenDataMessage({ type: 'HIDE_FRIEND_RANK' });
     }
 
     public static isActive(): boolean {
@@ -384,8 +388,66 @@ export class FriendRankView extends Component {
             return Math.abs(p.x) <= s.width / 2 && Math.abs(p.y) <= s.height / 2;
         };
         return hitNode(this._buttonNode)
-            || hitNode(this._instance?._closeNode ?? null)
+            || hitNode(this._closeNode ?? this._instance?._closeNode ?? null)
             || hitNode(this._backdropNode);
+    }
+
+    public static disposeRuntime(): void {
+        const inst = this._instance;
+        if (inst?._armCloseCb) {
+            try { inst.unschedule(inst._armCloseCb); } catch {}
+        }
+
+        if (this._buttonNode && this._buttonNode.isValid) {
+            this._detachButtonHandlers(this._buttonNode);
+            try {
+                this._buttonNode.removeFromParent();
+                this._buttonNode.destroy();
+            } catch {}
+        }
+
+        if (this._backdropNode && this._backdropNode.isValid) {
+            if (this._onBackdropSwallow) {
+                this._backdropNode.off(Node.EventType.TOUCH_START, this._onBackdropSwallow, this);
+                this._backdropNode.off(Node.EventType.TOUCH_MOVE, this._onBackdropSwallow, this);
+                this._backdropNode.off(Node.EventType.TOUCH_CANCEL, this._onBackdropSwallow, this);
+                this._backdropNode.off(Node.EventType.MOUSE_DOWN, this._onBackdropSwallow, this);
+                this._backdropNode.off(Node.EventType.MOUSE_MOVE, this._onBackdropSwallow, this);
+                this._backdropNode.off(Node.EventType.MOUSE_LEAVE, this._onBackdropSwallow, this);
+            }
+            if (this._onBackdropClose) {
+                this._backdropNode.off(Node.EventType.TOUCH_END, this._onBackdropClose, this);
+                this._backdropNode.off(Node.EventType.MOUSE_UP, this._onBackdropClose, this);
+            }
+            try {
+                this._backdropNode.removeFromParent();
+                this._backdropNode.destroy();
+            } catch {}
+        }
+
+        if (this._closeNode && this._closeNode.isValid) {
+            try {
+                this._closeNode.removeFromParent();
+                this._closeNode.destroy();
+            } catch {}
+        }
+
+        if (this._buttonResizeBound && this._onDesignResolutionChanged) {
+            view.off('design-resolution-changed', this._onDesignResolutionChanged, this);
+        }
+
+        this._instance = null;
+        this._buttonNode = null;
+        this._backdropNode = null;
+        this._closeNode = null;
+        this._buttonResizeBound = false;
+        this._onBackdropSwallow = null;
+        this._onBackdropClose = null;
+        this._onButtonTouchStart = null;
+        this._onButtonMouseDown = null;
+        this._onButtonTouchEnd = null;
+        this._onButtonMouseUp = null;
+        this._onDesignResolutionChanged = null;
     }
 
     // 按屏幕高度等比缩放并叠加安全区的上边距算法，避免写死一个像素值
@@ -462,7 +524,7 @@ export class FriendRankView extends Component {
         const instNow = FriendRankView._instance;
         const hitClose = (e: any): boolean => {
             try {
-                const close = (instNow as any)?._closeNode as Node | null;
+                const close = FriendRankView._closeNode ?? ((instNow as any)?._closeNode as Node | null);
                 if (!close || !close.isValid) return false;
                 const ui = close.getComponent(UITransform);
                 if (!ui || !ui.isValid) return false;
@@ -552,7 +614,7 @@ export class FriendRankView extends Component {
             // 让遮罩在榜单之下、并把榜单置顶（避免 setSiblingIndex 越界）
             // 最终顺序：... 其它UI ... -> Backdrop -> FriendRankRoot(榜单)
             const end = host.children.length - 1;
-            const close = (instNow as any)?._closeNode as Node | null;
+            const close = FriendRankView._closeNode ?? ((instNow as any)?._closeNode as Node | null);
             // 预留顶层给关闭按钮：Mask 次之，Root 居中，保证关闭按钮不会被遮罩盖住
             mask.setSiblingIndex(Math.max(0, end - (close ? 2 : 1)));
             root.setSiblingIndex(Math.max(0, end - (close ? 1 : 0)));
@@ -620,22 +682,7 @@ export class FriendRankView extends Component {
                 anyLab.shadowOffset = new Vec2(1, -1);
                 anyLab.shadowBlur = 1;
             }
-            btn.on(Input.EventType.TOUCH_START, (evt: any) => {
-                evt?.stopPropagationImmediate?.();
-                evt?.stopPropagation?.();
-            }, this);
-            btn.on(Input.EventType.MOUSE_DOWN, (evt: any) => {
-                evt?.stopPropagationImmediate?.();
-                evt?.stopPropagation?.();
-            }, this);
-            btn.on(Input.EventType.TOUCH_END, (evt: any) => {
-                evt?.stopPropagation?.();
-                this._handleButtonClick();
-            }, this);
-            btn.on(Input.EventType.MOUSE_UP, (evt: any) => {
-                evt?.stopPropagation?.();
-                this._handleButtonClick();
-            }, this);
+            this._attachButtonHandlers(btn);
             canvas.addChild(btn);
             this._buttonNode = btn;
         }
@@ -689,25 +736,66 @@ export class FriendRankView extends Component {
     private static _bindResizeForButton() {
         if (this._buttonResizeBound) return;
         this._buttonResizeBound = true;
-        view.on('design-resolution-changed', () => {
-            this._layoutButton();
-        }, this);
+        if (!this._onDesignResolutionChanged) {
+            this._onDesignResolutionChanged = () => {
+                this._layoutButton();
+            };
+        }
+        view.on('design-resolution-changed', this._onDesignResolutionChanged, this);
     }
 
-    private static _getWx(): any {
-        if (typeof wx !== 'undefined') return wx;
-        if (typeof window !== 'undefined' && (window as any).wx) return (window as any).wx;
-        return null;
+    private static _attachButtonHandlers(btn: Node): void {
+        this._ensureButtonHandlers();
+        this._detachButtonHandlers(btn);
+        if (this._onButtonTouchStart) btn.on(Input.EventType.TOUCH_START, this._onButtonTouchStart, this);
+        if (this._onButtonMouseDown) btn.on(Input.EventType.MOUSE_DOWN, this._onButtonMouseDown, this);
+        if (this._onButtonTouchEnd) btn.on(Input.EventType.TOUCH_END, this._onButtonTouchEnd, this);
+        if (this._onButtonMouseUp) btn.on(Input.EventType.MOUSE_UP, this._onButtonMouseUp, this);
     }
 
-    private static _handleButtonClick(): void {
+    private static _detachButtonHandlers(btn: Node | null): void {
+        if (!btn) return;
+        if (this._onButtonTouchStart) btn.off(Input.EventType.TOUCH_START, this._onButtonTouchStart, this);
+        if (this._onButtonMouseDown) btn.off(Input.EventType.MOUSE_DOWN, this._onButtonMouseDown, this);
+        if (this._onButtonTouchEnd) btn.off(Input.EventType.TOUCH_END, this._onButtonTouchEnd, this);
+        if (this._onButtonMouseUp) btn.off(Input.EventType.MOUSE_UP, this._onButtonMouseUp, this);
+    }
+
+    private static _ensureButtonHandlers(): void {
+        if (!this._onButtonTouchStart) {
+            this._onButtonTouchStart = (evt: any) => {
+                evt?.stopPropagationImmediate?.();
+                evt?.stopPropagation?.();
+            };
+        }
+        if (!this._onButtonMouseDown) {
+            this._onButtonMouseDown = (evt: any) => {
+                evt?.stopPropagationImmediate?.();
+                evt?.stopPropagation?.();
+            };
+        }
+        if (!this._onButtonTouchEnd) {
+            this._onButtonTouchEnd = (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleButtonClick();
+            };
+        }
+        if (!this._onButtonMouseUp) {
+            this._onButtonMouseUp = (evt: any) => {
+                evt?.stopPropagation?.();
+                this._handleButtonClick();
+            };
+        }
+    }
+
+    private static async _handleButtonClick(): Promise<void> {
         // 非微信环境直接显示，便于调试
         if (sys.platform !== sys.Platform.WECHAT_GAME) {
             try { this.show?.(); } catch (err) { console.warn('[FriendRank] show (non-wechat) failed', err); }
             return;
         }
-        const wxAny = this._getWx();
-        if (!wxAny) {
+        const wxPlatform = WxGamePlatform.getInstance();
+        if (!wxPlatform.isWechatGame()) {
             console.warn('[FriendRank] wx not available');
             return;
         }
@@ -717,15 +805,9 @@ export class FriendRankView extends Component {
             try { this.show?.(); } catch (err) { console.warn('[FriendRank] show failed', err); }
             return;
         }
-        wxAny.getUserProfile({
-            desc: '用于展示好友排行榜',
-            success: (_res: any) => {
-                try { sys.localStorage.setItem(KEY, '1'); } catch {}
-                try { this.show?.(); } catch (err) { console.warn('[FriendRank] show after auth failed', err); }
-            },
-            fail: (err: any) => {
-                console.warn('[FriendRank] getUserProfile cancelled/failed', err);
-            },
-        });
+        const profile = await wxPlatform.getUserProfile('用于展示好友排行榜');
+        if (!profile) return;
+        try { sys.localStorage.setItem(KEY, '1'); } catch {}
+        try { this.show?.(); } catch (err) { console.warn('[FriendRank] show after auth failed', err); }
     }
 }
